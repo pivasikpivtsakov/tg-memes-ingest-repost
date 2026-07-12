@@ -6,6 +6,7 @@ from telethon.tl.types import DocumentAttributeVideo, DocumentAttributeFilename
 from ingestion_app.config import config
 from ingestion_app.handlers.utils import get_sender_name
 from shared.storage import MediaStorage
+from shared.redis import create_redis, AllowedChatsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,9 @@ media_storage = MediaStorage(
     config.minio_bucket,
     config.minio_secure
 )
+
+redis_client = create_redis(config.redis_url)
+allowed_chats = AllowedChatsRepository(redis=redis_client)
 
 
 def extract_video_attributes(video):
@@ -49,19 +53,16 @@ def determine_video_extension(video, filename):
 
 
 def register_message_handler(client: TelegramClient) -> None:
-    """Register new message event handler with optional chat/channel filtering."""
-    allowed_chats = config.allowed_chat_ids
-    
-    if allowed_chats:
-        logger.info(f"Registering message handler with chat filter: {allowed_chats}")
-        event_filter = events.NewMessage(chats=allowed_chats)
-    else:
-        logger.info("Registering message handler (accepting all chats)")
-        event_filter = events.NewMessage()
-    
-    @client.on(event_filter)
+    """Register new message event handler."""
+    logger.info("Registering message handler")
+
+    @client.on(events.NewMessage())
     async def handle_new_message(event: events.NewMessage.Event) -> None:
         try:
+            chat_id = event.chat_id
+            if not await allowed_chats.is_allowed(chat_id=chat_id):
+                return
+
             sender = await event.get_sender()
             chat = await event.get_chat()
             
@@ -73,7 +74,6 @@ def register_message_handler(client: TelegramClient) -> None:
             
             # Groups/Channels have title, private chats (User) don't
             chat_title = getattr(chat, 'title', 'Private Chat')
-            chat_id = event.chat_id
 
             message_text = event.message.text or '<non-text message>'
             message_id = event.message.id

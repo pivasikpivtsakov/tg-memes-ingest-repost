@@ -29,6 +29,12 @@ class BaseConfig:
         self._db_user = self._config_data.get('db_user', 'postgres')
         self._db_password = self._config_data.get('db_password', '')
 
+        # Redis settings (required for all apps)
+        self._redis_host = self._config_data.get('redis_host', 'localhost')
+        self._redis_port = self._config_data.get('redis_port', 6379)
+        self._redis_db = self._config_data.get('redis_db', 0)
+        self._redis_password = self._config_data.get('redis_password', None)
+
         # MinIO settings (required for all apps)
         self._minio_endpoint = self._config_data.get('minio_endpoint', 'localhost:9000')
         self._minio_access_key = self._config_data.get('minio_access_key', 'minioadmin')
@@ -89,6 +95,30 @@ class BaseConfig:
     def database_url(self) -> str:
         """Get PostgreSQL connection string using psycopg (version 3) driver."""
         return f"postgresql+psycopg://{self._db_user}:{self._db_password}@{self._db_host}:{self._db_port}/{self._db_name}"
+    
+    # ===== Redis Settings =====
+    
+    @property
+    def redis_host(self) -> str:
+        return self._redis_host
+    
+    @property
+    def redis_port(self) -> int:
+        return int(self._redis_port)
+    
+    @property
+    def redis_db(self) -> int:
+        return int(self._redis_db)
+    
+    @property
+    def redis_password(self) -> str | None:
+        return self._redis_password
+    
+    @property
+    def redis_url(self) -> str:
+        """Get Redis connection string (redis://[:password@]host:port/db)."""
+        auth = f":{self._redis_password}@" if self._redis_password else ""
+        return f"redis://{auth}{self._redis_host}:{self._redis_port}/{self._redis_db}"
     
     # ===== MinIO Settings =====
     

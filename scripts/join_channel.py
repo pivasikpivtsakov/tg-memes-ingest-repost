@@ -12,10 +12,15 @@ Example:
 """
 import asyncio
 import json5
-import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from telethon import TelegramClient, functions, types
+
+from ingestion_app.config import config as app_config
+from shared.redis import AllowedChatsRepository, create_redis
 
 
 async def join_channel_and_mute(channel_username: str):
@@ -41,7 +46,10 @@ async def join_channel_and_mute(channel_username: str):
     
     # Create Telegram client with sender session
     client = TelegramClient(session_name, api_id, api_hash)
-    
+
+    redis = create_redis(app_config.redis_url)
+    allowed_chats = AllowedChatsRepository(redis=redis)
+
     print(f"Connecting using session: {session_name}")
     print(f"Target channel: {channel_username}\n")
     print("=" * 70)
@@ -101,13 +109,9 @@ async def join_channel_and_mute(channel_username: str):
                 print(f"❌ Error disabling notifications: {e}")
                 return
             
-            # Step 4: Add channel to config.json
-            print(f"📝 Adding channel to config.json...")
+            # Step 4: Add channel to the Redis allowed-chats hash
+            print(f"📝 Adding channel to Redis allowed_chats...")
             try:
-                # Read the current config file
-                with open(config_path, 'r') as f:
-                    config_content = f.read()
-                
                 # Get the proper channel ID (convert if needed)
                 # For channels, the ID should be in format -100XXXXXXXXX
                 if hasattr(channel, 'id'):
@@ -120,40 +124,14 @@ async def join_channel_and_mute(channel_username: str):
                 else:
                     print(f"⚠️  Warning: Channel has no ID attribute")
                     return
-                
-                if str(channel_id) in config_content:
-                    print(f"ℹ️  Channel already exists in config.json")
-                else:
-                    # Prepare the comment with channel name and username
-                    username_part = f"@{channel.username}" if hasattr(channel, 'username') and channel.username else "no username"
-                    comment = f"  {channel_id},  // {channel.title} ({username_part})"
-                    
-                    # Find the allowed_chat_ids section and add the new entry
-                    # Find the last entry in allowed_chat_ids array
-                    pattern = r'("allowed_chat_ids":\s*\[)(.*?)(\s*\],)'
-                    match = re.search(pattern, config_content, re.DOTALL)
-                    
-                    if match:
-                        # Get the existing entries
-                        before = match.group(1)
-                        entries = match.group(2)
-                        after = match.group(3)
-                        
-                        # Add the new entry at the end
-                        new_entries = entries.rstrip() + '\n' + comment + '\n  '
-                        new_config_content = config_content[:match.start()] + before + new_entries + after + config_content[match.end():]
-                        
-                        # Write back to file
-                        with open(config_path, 'w') as f:
-                            f.write(new_config_content)
-                        
-                        print(f"✅ Channel added to config.json")
-                    else:
-                        print(f"⚠️  Warning: Could not find allowed_chat_ids in config.json")
-                
+
+                username_part = f"@{channel.username}" if hasattr(channel, 'username') and channel.username else "no username"
+                label = f"{channel.title} ({username_part})"
+                await allowed_chats.add(chat_id=channel_id, label=label)
+                print(f"✅ Channel added to Redis allowed_chats: {channel_id} // {label}")
                 print()
             except Exception as e:
-                print(f"⚠️  Warning: Could not update config.json: {e}")
+                print(f"⚠️  Warning: Could not update Redis allowed_chats: {e}")
                 print()
             
             print("=" * 70)
@@ -162,6 +140,8 @@ async def join_channel_and_mute(channel_username: str):
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         raise
+    finally:
+        await redis.aclose()
 
 
 def main():

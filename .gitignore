@@ -1,0 +1,7 @@
+.idea/
+.cursor/
+/deploy_the_shit.sh
+/.cursorignore
+/config.json
+/ingestion.session
+/sender.session
