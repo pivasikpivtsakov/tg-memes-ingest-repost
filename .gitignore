@@ -5,3 +5,4 @@
 /config.json
 /ingestion.session
 /sender.session
+/scripts/download_from_minio.py

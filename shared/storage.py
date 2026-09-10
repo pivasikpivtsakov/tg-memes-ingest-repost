@@ -41,6 +41,8 @@ class MediaMetadata(BaseModel):
     is_sent_tg: bool = False
     downloaded_at: datetime
     created_at: Optional[datetime] = None
+    posted_at_tg: datetime | None = None
+    posted_at_tiktok: datetime | None = None
     
     class Config:
         from_attributes = True
@@ -294,7 +296,10 @@ class MediaStorage:
             bool: True if the media was successfully marked, False if media not found
         """
         with self._get_session() as session:
-            stmt = update(Media).where(Media.id == media_id).values(is_sent_tg=True)
+            stmt = update(Media).where(Media.id == media_id).values(
+                is_sent_tg=True,
+                posted_at_tg=func.current_timestamp(),
+            )
             result = session.execute(stmt)
             
             updated = result.rowcount > 0

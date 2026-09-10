@@ -117,6 +117,10 @@ class Media(Base):
         server_default='false',
         comment="Whether media has been sent to Telegram target channel"
     )
+    posted_at_tg: Mapped[datetime | None] = mapped_column(
+        nullable=True,
+        comment="When media was marked sent to Telegram target channel"
+    )
 
     is_sent_tiktok: Mapped[bool] = mapped_column(
         Boolean, 
@@ -124,6 +128,10 @@ class Media(Base):
         default=False,
         server_default='false',
         comment="Whether media has been sent to TikTok target account"
+    )
+    posted_at_tiktok: Mapped[datetime | None] = mapped_column(
+        nullable=True,
+        comment="When media was marked sent to TikTok target account"
     )
     
     # Timestamps
@@ -137,7 +145,7 @@ class Media(Base):
         nullable=True,
         comment="Original creation timestamp from Telegram"
     )
-    
+
     # Table constraints
     __table_args__ = (
         CheckConstraint(
