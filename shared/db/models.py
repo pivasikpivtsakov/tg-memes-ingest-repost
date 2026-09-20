@@ -113,6 +113,11 @@ class Media(Base):
         nullable=True,
         comment="Video codec reported by Telegram source (e.g. 'h264', 'h265', 'av1'); videos only"
     )
+    round_message: Mapped[Optional[bool]] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="Whether the source video is a round video note (circular message); videos only"
+    )
     
     # Status tracking
     is_sent_tg: Mapped[bool] = mapped_column(

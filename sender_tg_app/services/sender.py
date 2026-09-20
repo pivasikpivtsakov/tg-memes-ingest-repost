@@ -181,7 +181,8 @@ class MemesSender:
                 # if we know the width and height, we add it explicitly. 
                 # telethon or telegram should not try to guess and repair it.
                 # they often do it wrong.
-                if media.width and media.height:
+                if media.width and media.height and media.width > 1 and media.height > 1:
+                    is_round = bool(media.round_message)
                     kwargs['attributes'] = [
                         DocumentAttributeVideo(
                             duration=media.duration or 0,
@@ -189,8 +190,11 @@ class MemesSender:
                             h=media.height,
                             supports_streaming=True,
                             video_codec=media.video_codec,
+                            round_message=is_round,
                         )
                     ]
+                    if is_round:
+                        kwargs['video_note'] = True
             
             message: Message = await self.client.send_file(**kwargs)
             
