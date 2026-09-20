@@ -38,6 +38,7 @@ class MediaMetadata(BaseModel):
     height: Optional[int] = None
     duration: Optional[int] = None  # Only for videos
     mime_type: Optional[str] = None  # Only for videos
+    video_codec: Optional[str] = None  # Only for videos, e.g. "h264", "h265", "av1"
     is_sent_tg: bool = False
     downloaded_at: datetime
     created_at: Optional[datetime] = None
@@ -171,7 +172,8 @@ class MediaStorage:
         duration: Optional[int] = None,
         mime_type: Optional[str] = None,
         file_extension: Optional[str] = None,
-        created_at: Optional[datetime] = None
+        created_at: Optional[datetime] = None,
+        video_codec: Optional[str] = None
     ) -> tuple[str, bool]:
         """
         Save media (photo or video) to MinIO with flat structure and metadata tracking.
@@ -235,7 +237,8 @@ class MediaStorage:
                 height=height,
                 duration=duration,
                 mime_type=mime_type,
-                created_at=created_at
+                created_at=created_at,
+                video_codec=video_codec
             )
             session.execute(stmt)
         

@@ -53,7 +53,7 @@ class DatabaseManager:
         
         Base.metadata.create_all(bind=self.engine)
         logger.info("Database tables initialized successfully")
-    
+
     @contextmanager
     def get_session(self) -> Generator[Session, None, None]:
         """

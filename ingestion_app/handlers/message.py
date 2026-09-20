@@ -28,14 +28,15 @@ allowed_chats = AllowedChatsRepository(redis=redis_client)
 
 
 def extract_video_attributes(video):
-    """Extract width, height, duration, and filename from video attributes."""
-    width = height = duration = filename = None
+    """Extract width, height, duration, codec, and filename from video attributes."""
+    width = height = duration = video_codec = filename = None
     for attr in video.attributes:
         if isinstance(attr, DocumentAttributeVideo):
             width, height, duration = attr.w, attr.h, attr.duration
+            video_codec = attr.video_codec
         elif isinstance(attr, DocumentAttributeFilename):
             filename = attr.file_name
-    return width, height, duration, filename
+    return width, height, duration, video_codec, filename
 
 
 def determine_video_extension(video, filename):
@@ -116,6 +117,7 @@ def register_message_handler(client: TelegramClient) -> None:
                 media_type = "photo"
                 telegram_id = photo.id
                 duration = None
+                video_codec = None
                 mime_type = 'image/jpeg'
                 file_extension = 'jpg'
                 created_at = photo.date
@@ -139,7 +141,7 @@ def register_message_handler(client: TelegramClient) -> None:
                 media_bytes = await client.download_media(event.message, file=bytes)
                 
                 # Extract video attributes
-                width, height, duration, filename = extract_video_attributes(video)
+                width, height, duration, video_codec, filename = extract_video_attributes(video)
                 file_extension = determine_video_extension(video, filename)
                 
                 # Prepare video metadata
@@ -165,7 +167,8 @@ def register_message_handler(client: TelegramClient) -> None:
                     duration=duration,
                     mime_type=mime_type,
                     file_extension=file_extension,
-                    created_at=created_at
+                    created_at=created_at,
+                    video_codec=video_codec
                 )
                 
                 logger.info(f"{media_type.capitalize()} {'duplicate' if is_duplicate else 'saved'}: {file_path}")

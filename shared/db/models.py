@@ -108,6 +108,11 @@ class Media(Base):
         nullable=False,
         comment="MIME type of the media file"
     )
+    video_codec: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Video codec reported by Telegram source (e.g. 'h264', 'h265', 'av1'); videos only"
+    )
     
     # Status tracking
     is_sent_tg: Mapped[bool] = mapped_column(
