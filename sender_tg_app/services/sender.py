@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from io import BytesIO
 from dataclasses import dataclass
@@ -6,6 +7,7 @@ from telethon import TelegramClient
 from telethon.errors import FloodWaitError, FileReferenceExpiredError, MediaEmptyError
 from telethon.tl.types import Message, DocumentAttributeVideo
 
+from sender_tg_app.services.video_thumbnail import generate_video_thumbnail, needs_own_thumbnail
 from shared.storage import MediaStorage, MediaMetadata
 
 logger = logging.getLogger(__name__)
@@ -121,6 +123,19 @@ class MemesSender:
         
         return result
     
+    async def _build_own_thumbnail_if_needed(self, media: MediaMetadata, media_data: bytes) -> BytesIO | None:
+        if not needs_own_thumbnail(len(media_data)):
+            return None
+        try:
+            thumb_data = await asyncio.to_thread(generate_video_thumbnail, media_data)
+        except Exception as e:
+            logger.warning(f"Failed to generate thumbnail for video #{media.id}: {e}. Sending without thumbnail")
+            return None
+        thumb_buffer = BytesIO(thumb_data)
+        thumb_buffer.name = "thumb.jpg"
+        logger.info(f"Generated own thumbnail for video #{media.id} ({len(thumb_data)} bytes)")
+        return thumb_buffer
+
     async def _send_single_meme(self, media: MediaMetadata) -> bool:
         """
         Send a single meme (photo or video) to the target channel.
@@ -195,6 +210,9 @@ class MemesSender:
                             round_message=is_round,
                         )
                     ]
+                thumb = await self._build_own_thumbnail_if_needed(media=media, media_data=media_data)
+                if thumb is not None:
+                    kwargs['thumb'] = thumb
 
             message: Message = await self.client.send_file(**kwargs)
             
