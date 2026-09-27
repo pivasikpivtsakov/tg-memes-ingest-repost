@@ -4,7 +4,7 @@ Script to list all allowed channels from config.json with their names and IDs.
 Uses the sender_tg_app Telegram session.
 """
 import asyncio
-import json
+import json5
 import sys
 from pathlib import Path
 
@@ -20,7 +20,7 @@ async def main() -> None:
     # Load config
     config_path = Path(__file__).parent.parent / 'config.json'
     with open(config_path, 'r') as f:
-        config = json.load(f)
+        config = json5.load(f)
     
     # Extract necessary config values
     api_id = config['telegram_api_id']
