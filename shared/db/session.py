@@ -5,7 +5,7 @@ import logging
 from contextlib import contextmanager
 from typing import Generator
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from shared.db.base import Base
@@ -38,19 +38,6 @@ class DatabaseManager:
         )
     
     def init_db(self) -> None:
-        """
-        Initialize database: create all tables and required extensions.
-        
-        This is idempotent - safe to call multiple times.
-        """
-        with self.engine.connect() as conn:
-            try:
-                conn.execute(text("CREATE EXTENSION IF NOT EXISTS tsm_system_rows"))
-                conn.commit()
-                logger.info("PostgreSQL extension tsm_system_rows ensured")
-            except Exception as e:
-                logger.warning(f"Could not create extension tsm_system_rows: {e}")
-        
         Base.metadata.create_all(bind=self.engine)
         logger.info("Database tables initialized successfully")
 

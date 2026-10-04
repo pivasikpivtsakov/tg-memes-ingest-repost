@@ -1,142 +1,85 @@
 #!/usr/bin/env python3
-"""
-Script to leave a Telegram channel by username and remove it from Redis.
-Uses the sender_tg_app Telegram session.
-
-Usage:
-    python remove_channel.py <channel_username>
-    
-Example:
-    python remove_channel.py @mychannel
-    python remove_channel.py mychannel
-"""
+"""Leave a Telegram channel and remove it from the ingestion allowlist."""
 import asyncio
-import json5
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from telethon import TelegramClient, functions
+from telethon import TelegramClient
 
-from ingestion_app.config import config as app_config
+from sender_tg_app.config import config
+from shared.services import (
+    ChannelTarget,
+    ChannelTargetKind,
+    leave_and_unallow,
+    parse_channel_target,
+    resolve_channel,
+)
 from shared.redis import AllowedChatsRepository, create_redis
 
 
-async def leave_channel_and_unallow(channel_username: str):
-    """
-    Leave a Telegram channel and remove it from Redis allowed_chats.
-    
-    Args:
-        channel_username: Channel username (with or without @)
-    """
-    # Normalize username
-    if not channel_username.startswith('@'):
-        channel_username = f'@{channel_username}'
-    
-    # Load config
-    config_path = Path(__file__).parent.parent / 'config.json'
-    with open(config_path, 'r') as f:
-        config = json5.load(f)
-    
-    # Extract necessary config values
-    api_id = config['telegram_api_id']
-    api_hash = config['telegram_api_hash']
-    session_name = config['sender_session_name']
-    
-    # Create Telegram client with sender session
-    client = TelegramClient(session_name, api_id, api_hash)
+async def leave_channel(raw_target: str) -> int:
+    target = parse_channel_target(raw_target)
+    if target is None:
+        print(f"Could not parse channel target: {raw_target}")
+        return 1
 
-    redis = create_redis(app_config.redis_url)
+    redis = create_redis(config.redis_url)
     allowed_chats = AllowedChatsRepository(redis=redis)
-
-    print(f"Connecting using session: {session_name}")
-    print(f"Target channel: {channel_username}\n")
-    print("=" * 70)
-    
+    client = TelegramClient(config.session_name, config.api_id, config.api_hash)
+    print(f"Connecting using session: {config.session_name}")
     try:
         async with client:
-            # Get current user info
-            me = await client.get_me()
-            username = f"@{me.username}" if me.username else "No username"
-            print(f"Logged in as: {me.first_name} {username} (ID: {me.id})")
-            print("=" * 70)
-            print()
-            
-            # Step 1: Get the channel entity
-            print(f"🔍 Looking up channel: {channel_username}")
-            try:
-                channel = await client.get_entity(channel_username)
-                print(f"✅ Found channel: {channel.title}")
-                print(f"   ID: {channel.id}")
-                print()
-            except Exception as e:
-                print(f"❌ Error: Could not find channel '{channel_username}'")
-                print(f"   Details: {e}")
-                return
-            
-            # Step 2: Leave the channel
-            print(f"📤 Leaving channel...")
-            try:
-                result = await client(functions.channels.LeaveChannelRequest(
-                    channel=channel
-                ))
-                print(f"✅ Successfully left '{channel.title}'")
-                print()
-            except Exception as e:
-                if "not a participant" in str(e).lower() or "not a member" in str(e).lower():
-                    print(f"ℹ️  Not a member of '{channel.title}'")
-                    print()
-                else:
-                    print(f"❌ Error leaving channel: {e}")
-                    return
-            
-            # Step 3: Remove channel from the Redis allowed-chats hash
-            print(f"📝 Removing channel from Redis allowed_chats...")
-            try:
-                # Get the proper channel ID (convert if needed)
-                # For channels, the ID should be in format -100XXXXXXXXX
-                if hasattr(channel, 'id'):
-                    # If it's already in the correct format, use it
-                    if str(channel.id).startswith('-100'):
-                        channel_id = channel.id
-                    else:
-                        # Convert to the broadcast format
-                        channel_id = int(f"-100{channel.id}")
-                else:
-                    print(f"⚠️  Warning: Channel has no ID attribute")
-                    return
-
-                username_part = f"@{channel.username}" if hasattr(channel, 'username') and channel.username else "no username"
-                label = f"{channel.title} ({username_part})"
-                await allowed_chats.remove(chat_id=channel_id)
-                print(f"✅ Channel removed from Redis allowed_chats: {channel_id} // {label}")
-                print()
-            except Exception as e:
-                print(f"⚠️  Warning: Could not update Redis allowed_chats: {e}")
-                print()
-            
-            print("=" * 70)
-            print(f"🎉 All done! Channel '{channel.title}' left and removed from Redis.")
-    
-    except Exception as e:
-        print(f"❌ Unexpected error: {e}")
-        raise
+            chat_id = await _resolve_chat_id(
+                client=client,
+                allowed_chats=allowed_chats,
+                target=target,
+            )
+            if chat_id is None:
+                print(f"Channel not found in allowlist and could not be resolved: {raw_target}")
+                return 1
+            print(f"Leaving chat_id={chat_id}")
+            result = await leave_and_unallow(client, allowed_chats, chat_id)
+    except Exception as exc:
+        print(f"Leave failed: {exc}")
+        return 1
     finally:
         await redis.aclose()
 
+    print(f"OK: removed {result.label} // {result.chat_id}")
+    return 0
 
-def main():
-    """Main entry point."""
+
+async def _resolve_chat_id(
+    *,
+    client: TelegramClient,
+    allowed_chats: AllowedChatsRepository,
+    target: ChannelTarget,
+) -> int | None:
+    if target.kind is ChannelTargetKind.ID:
+        return int(target.value)
+
+    stored = await allowed_chats.all()
+    needle = target.value.lower()
+    for chat_id, label in stored.items():
+        if f"@{needle}" in label.lower() or needle in label.lower():
+            return chat_id
+
+    try:
+        result = await resolve_channel(client, target)
+    except Exception:
+        return None
+    return result.chat_id
+
+
+def main() -> None:
     if len(sys.argv) != 2:
-        print("Usage: python remove_channel.py <channel_username>")
+        print("Usage: python remove_channel.py <channel_username_or_link>")
         print("\nExample:")
         print("  python remove_channel.py @mychannel")
-        print("  python remove_channel.py mychannel")
         sys.exit(1)
-    
-    channel_username = sys.argv[1]
-    asyncio.run(leave_channel_and_unallow(channel_username))
+    sys.exit(asyncio.run(leave_channel(sys.argv[1])))
 
 
 if __name__ == "__main__":

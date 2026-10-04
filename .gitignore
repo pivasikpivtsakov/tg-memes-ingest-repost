@@ -1,8 +1,13 @@
 .idea/
+.venv/
+__pycache__/
+*.py[cod]
 .cursor/
 /deploy_the_shit.sh
 /.cursorignore
 /config.json
 /ingestion.session
 /sender.session
+/admin.session
 /scripts/download_from_minio.py
+locales/**/*.mo

@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from pydantic import BaseModel
 import boto3
 from botocore.exceptions import ClientError
-from sqlalchemy import func, select, insert, update, case, distinct
+from sqlalchemy import func, select, insert, update
 
 from shared.db import Media, DatabaseManager
 
@@ -45,21 +45,6 @@ class MediaMetadata(BaseModel):
     created_at: Optional[datetime] = None
     posted_at_tg: datetime | None = None
     posted_at_tiktok: datetime | None = None
-    
-    class Config:
-        from_attributes = True
-
-
-class StorageStatistics(BaseModel):
-    """Pydantic model for storage statistics."""
-    total_photos: int = 0
-    total_videos: int = 0
-    total_medias: int = 0
-    total_chats: int = 0
-    total_senders: int = 0
-    total_size_bytes: int = 0
-    first_download: Optional[datetime] = None
-    last_download: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -292,15 +277,7 @@ class MediaStorage:
             return [MediaMetadata.model_validate(media) for media in results]
     
     def mark_media_as_sent(self, media_id: int) -> bool:
-        """
-        Mark a media item as sent.
-        
-        Args:
-            media_id: The database ID of the media to mark as sent
-            
-        Returns:
-            bool: True if the media was successfully marked, False if media not found
-        """
+        """Mark a media item as sent to the Telegram target channel."""
         with self._get_session() as session:
             stmt = update(Media).where(Media.id == media_id).values(
                 is_sent_tg=True,
@@ -314,33 +291,3 @@ class MediaStorage:
             else:
                 logger.warning(f"Media #{media_id} not found")
             return updated
-    
-    def get_statistics(self) -> StorageStatistics:
-        """Get storage statistics for all media."""
-        with self._get_session() as session:
-            stmt = select(
-                func.count(Media.id).label('total_medias'),
-                func.count(case((Media.media_type == 'photo', 1))).label('total_photos'),
-                func.count(case((Media.media_type == 'video', 1))).label('total_videos'),
-                func.count(distinct(Media.chat_id)).label('total_chats'),
-                func.count(distinct(Media.sender_id)).label('total_senders'),
-                func.coalesce(func.sum(Media.file_size), 0).label('total_size_bytes'),
-                func.min(Media.downloaded_at).label('first_download'),
-                func.max(Media.downloaded_at).label('last_download')
-            )
-            
-            result = session.execute(stmt).first()
-            
-            if not result or result.total_medias == 0:
-                return StorageStatistics()
-            
-            return StorageStatistics(
-                total_medias=result.total_medias,
-                total_photos=result.total_photos,
-                total_videos=result.total_videos,
-                total_chats=result.total_chats,
-                total_senders=result.total_senders,
-                total_size_bytes=result.total_size_bytes,
-                first_download=result.first_download,
-                last_download=result.last_download
-            )

@@ -1,26 +1,32 @@
-[tool.poetry]
+[project]
 name = "tg-memes-ingest-repost"
 version = "0.1.0"
 description = ""
-authors = ["pivasikpivtsakov <elda250@live.com>"]
-readme = "README.md"
-package-mode = false
+authors = [{ name = "pivasikpivtsakov", email = "elda250@live.com" }]
+requires-python = ">=3.14,<3.15"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "telethon>=1.41.2,<2",
+    "pydantic>=2.0,<3",
+    "psycopg[binary]>=3.2,<4",
+    "python-crontab>=3.3.0,<4",
+    "croniter>=6.0.0,<7",
+    "json5>=0.12.1,<0.13",
+    "colorlog>=6.9.0,<7",
+    "boto3>=1.40.48,<2",
+    "sqlalchemy>=2.0.44,<3",
+    "tiktok-uploader>=1.1.5,<2",
+    "redis>=8.0.1,<9",
+    "av>=18.1.0,<19",
+    "aiogram[i18n]>=3.28.2",
+]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-telethon = "^1.41.2"
-pydantic = "^2.0"
-psycopg = {extras = ["binary"], version = "^3.2"}
-python-crontab = "^3.3.0"
-croniter = "^6.0.0"
-json5 = "^0.12.1"
-colorlog = "^6.9.0"
-boto3 = "^1.40.48"
-sqlalchemy = "^2.0.44"
-tiktok-uploader = "^1.1.5"
-redis = "^8.0.1"
-av = "^18.1.0"
+[tool.uv]
+package = false
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.12.22,<0.13.0"]
+build-backend = "uv_build"

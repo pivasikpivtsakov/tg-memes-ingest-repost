@@ -70,15 +70,9 @@ class MemesSender:
         """
         logger.info(f"Attempting to send {count} meme(s) to {self.target_chat_id}")
         
-        # Ensure the target entity is resolved before sending
         await self._ensure_entity_resolved()
-        
-        # Get unsent media from unified table (automatically sorted by downloaded_at, oldest first)
-        unsent_media = self.storage.get_unsent_media(
-            limit=count,
-            order_by=None,
-            order_direction='ASC',
-        )
+
+        unsent_media = self.storage.get_unsent_media(limit=count)
 
         if not unsent_media:
             logger.info("No unsent memes found in database")
@@ -215,8 +209,7 @@ class MemesSender:
                     kwargs['thumb'] = thumb
 
             message: Message = await self.client.send_file(**kwargs)
-            
-            # Mark as sent in database
+
             self.storage.mark_media_as_sent(media.id)
             
             logger.info(

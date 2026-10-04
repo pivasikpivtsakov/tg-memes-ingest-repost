@@ -171,6 +171,7 @@ class Media(Base):
         Index('idx_file_hash', 'file_hash'),
         Index('idx_is_sent', 'is_sent_tg'),
         Index('idx_is_sent_media_type', 'is_sent_tg', 'media_type'),
+        Index('idx_posted_at_tg', 'posted_at_tg'),
     )
     
     def __repr__(self) -> str:

@@ -35,6 +35,8 @@ class BaseConfig:
         self._redis_db = self._config_data.get('redis_db', 0)
         self._redis_password = self._config_data.get('redis_password', None)
 
+        self._target_chat_id = self._config_data.get('target_chat_id')
+
         # MinIO settings (required for all apps)
         self._minio_endpoint = self._config_data.get('minio_endpoint', 'localhost:9000')
         self._minio_access_key = self._config_data.get('minio_access_key', 'minioadmin')
@@ -68,6 +70,11 @@ class BaseConfig:
     @property
     def credentials(self) -> Tuple[int, str]:
         return (self.api_id, self.api_hash)
+
+    @property
+    def target_chat_id(self) -> str:
+        """Destination channel ID or username where memes are posted."""
+        return self._target_chat_id
     
     # ===== Database Settings =====
     

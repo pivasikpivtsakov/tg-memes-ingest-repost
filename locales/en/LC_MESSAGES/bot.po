@@ -1,0 +1,183 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: tg-memes-ingest-repost 0.1.0\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "access.denied"
+msgstr "No access."
+
+msgid "menu.welcome"
+msgstr "Admin panel. Pick a section."
+
+msgid "menu.tap_menu"
+msgstr "The Menu button is pinned below."
+
+msgid "menu.btn_menu"
+msgstr "☰ Menu"
+
+msgid "menu.btn_back"
+msgstr "Back"
+
+msgid "menu.btn_channels"
+msgstr "Publics"
+
+msgid "menu.btn_admins"
+msgstr "Admins"
+
+msgid "menu.btn_language"
+msgstr "Language"
+
+msgid "menu.btn_cancel"
+msgstr "Cancel"
+
+msgid "menu.btn_prev"
+msgstr "« Prev"
+
+msgid "menu.btn_next"
+msgstr "Next »"
+
+msgid "menu.btn_confirm"
+msgstr "Confirm"
+
+msgid "menu.btn_yes"
+msgstr "Yes"
+
+msgid "menu.btn_no"
+msgstr "No"
+
+msgid "channels.title"
+msgstr "Allowed publics"
+
+msgid "channels.empty"
+msgstr "The list is empty. Add a public with the button below."
+
+msgid "channels.btn_add"
+msgstr "Add public"
+
+msgid "channels.btn_delete"
+msgstr "✕"
+
+msgid "channels.add_prompt"
+msgstr "Send an @username, a t.me link, or forward any message from the public."
+
+msgid "channels.invalid_target"
+msgstr "Could not parse that. Need an @username, t.me link, invite, or a forward from the public."
+
+msgid "channels.preview"
+msgstr "Public: <b>{title}</b>\nUsername: {username}\nID: <code>{chat_id}</code>\n\nJoin and add to the allowlist?"
+
+msgid "channels.preview_invite"
+msgstr "Invite: <b>{title}</b>\n\nJoin and add to the allowlist?"
+
+msgid "channels.joining"
+msgstr "Joining the public…"
+
+msgid "channels.join_failed"
+msgstr "Could not join the public."
+
+msgid "channels.remove_confirm"
+msgstr "Remove <b>{label}</b> from the allowlist and leave the public?"
+
+msgid "channels.removing"
+msgstr "Leaving the public…"
+
+msgid "channels.remove_failed"
+msgstr "Could not leave the public."
+
+msgid "channels.error_flood"
+msgstr "Telegram asks to wait {seconds}s."
+
+msgid "channels.error_not_found"
+msgstr "Public not found."
+
+msgid "channels.error_invite"
+msgstr "Invite is invalid or expired."
+
+msgid "channels.error_private"
+msgstr "This public is private; no access."
+
+msgid "channels.error_request"
+msgstr "A join request was sent and is waiting for approval."
+
+msgid "admins.title"
+msgstr "Bot admins"
+
+msgid "admins.empty"
+msgstr "No other admins yet."
+
+msgid "admins.super_suffix"
+msgstr "(super)"
+
+msgid "admins.btn_add"
+msgstr "Add admin"
+
+msgid "admins.btn_remove"
+msgstr "Remove"
+
+msgid "admins.add_prompt"
+msgstr "Send the user's numeric Telegram ID."
+
+msgid "admins.invalid_id"
+msgstr "Need a positive numeric Telegram ID."
+
+msgid "admins.added"
+msgstr "Admin <code>{user_id}</code> added."
+
+msgid "admins.already"
+msgstr "This user is already an admin."
+
+msgid "admins.cannot_remove_super"
+msgstr "The super admin cannot be removed."
+
+msgid "admins.not_found"
+msgstr "That admin is not in the list."
+
+msgid "language.title"
+msgstr "Interface language"
+
+msgid "language.changed"
+msgstr "Language updated."
+
+msgid "meme.not_from_ours"
+msgstr "Forward a meme from our public."
+
+msgid "meme.not_found"
+msgstr "Meme not found in the database."
+
+msgid "meme.no_caption"
+msgstr "none"
+
+msgid "meme.card"
+msgstr ""
+"Source public: <b>{source}</b>\n"
+"Source chat ID: <code>{chat_id}</code>\n"
+"Source message: {message_link}\n"
+"Downloaded: {downloaded_at}\n"
+"Original date: {created_at}\n"
+"Posted to ours: {posted_at_tg}\n"
+"\n"
+"Database ID: <code>{media_id}</code>\n"
+"Type: {media_type}\n"
+"Size: {file_size}\n"
+"Dimensions: {dimensions}\n"
+"Duration: {duration}\n"
+"MIME: {mime_type}\n"
+"Codec: {video_codec}\n"
+"Round: {round_message}\n"
+"Sender: {sender_name} (<code>{sender_id}</code>)\n"
+"Caption: {caption}"
+
+msgid "unknown"
+msgstr "I did not get that. Open the menu or forward a meme from our public."
+
+msgid "common.dash"
+msgstr "—"
+
+msgid "common.yes"
+msgstr "yes"
+
+msgid "common.no"
+msgstr "no"

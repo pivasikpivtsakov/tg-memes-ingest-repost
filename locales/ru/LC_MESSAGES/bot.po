@@ -1,0 +1,183 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: tg-memes-ingest-repost 0.1.0\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "access.denied"
+msgstr "Нет доступа."
+
+msgid "menu.welcome"
+msgstr "Админ-панель. Выберите раздел."
+
+msgid "menu.tap_menu"
+msgstr "Кнопка «Меню» закреплена внизу."
+
+msgid "menu.btn_menu"
+msgstr "☰ Меню"
+
+msgid "menu.btn_back"
+msgstr "Назад"
+
+msgid "menu.btn_channels"
+msgstr "Паблики"
+
+msgid "menu.btn_admins"
+msgstr "Админы"
+
+msgid "menu.btn_language"
+msgstr "Язык"
+
+msgid "menu.btn_cancel"
+msgstr "Отмена"
+
+msgid "menu.btn_prev"
+msgstr "« Назад"
+
+msgid "menu.btn_next"
+msgstr "Дальше »"
+
+msgid "menu.btn_confirm"
+msgstr "Подтвердить"
+
+msgid "menu.btn_yes"
+msgstr "Да"
+
+msgid "menu.btn_no"
+msgstr "Нет"
+
+msgid "channels.title"
+msgstr "Разрешённые паблики"
+
+msgid "channels.empty"
+msgstr "Список пуст. Добавьте паблик кнопкой ниже."
+
+msgid "channels.btn_add"
+msgstr "Добавить паблик"
+
+msgid "channels.btn_delete"
+msgstr "✕"
+
+msgid "channels.add_prompt"
+msgstr "Пришлите @username, ссылку t.me или перешлите любое сообщение из паблика."
+
+msgid "channels.invalid_target"
+msgstr "Не понял цель. Нужен @username, ссылка t.me, инвайт или пересылка из паблика."
+
+msgid "channels.preview"
+msgstr "Паблик: <b>{title}</b>\nUsername: {username}\nID: <code>{chat_id}</code>\n\nВступить и добавить в allowlist?"
+
+msgid "channels.preview_invite"
+msgstr "Инвайт: <b>{title}</b>\n\nВступить и добавить в allowlist?"
+
+msgid "channels.joining"
+msgstr "Вступаю в паблик…"
+
+msgid "channels.join_failed"
+msgstr "Не удалось вступить в паблик."
+
+msgid "channels.remove_confirm"
+msgstr "Удалить <b>{label}</b> из allowlist и выйти из паблика?"
+
+msgid "channels.removing"
+msgstr "Выхожу из паблика…"
+
+msgid "channels.remove_failed"
+msgstr "Не удалось выйти из паблика."
+
+msgid "channels.error_flood"
+msgstr "Telegram просит подождать {seconds} с."
+
+msgid "channels.error_not_found"
+msgstr "Паблик не найден."
+
+msgid "channels.error_invite"
+msgstr "Инвайт недействителен или истёк."
+
+msgid "channels.error_private"
+msgstr "Паблик приватный, нет доступа."
+
+msgid "channels.error_request"
+msgstr "Заявка на вступление отправлена и ждёт одобрения."
+
+msgid "admins.title"
+msgstr "Админы бота"
+
+msgid "admins.empty"
+msgstr "Других админов пока нет."
+
+msgid "admins.super_suffix"
+msgstr "(главный)"
+
+msgid "admins.btn_add"
+msgstr "Добавить админа"
+
+msgid "admins.btn_remove"
+msgstr "Удалить"
+
+msgid "admins.add_prompt"
+msgstr "Пришлите числовой Telegram ID пользователя."
+
+msgid "admins.invalid_id"
+msgstr "Нужен положительный числовой Telegram ID."
+
+msgid "admins.added"
+msgstr "Админ <code>{user_id}</code> добавлен."
+
+msgid "admins.already"
+msgstr "Этот пользователь уже админ."
+
+msgid "admins.cannot_remove_super"
+msgstr "Главного админа удалить нельзя."
+
+msgid "admins.not_found"
+msgstr "Такого админа нет в списке."
+
+msgid "language.title"
+msgstr "Язык интерфейса"
+
+msgid "language.changed"
+msgstr "Язык обновлён."
+
+msgid "meme.not_from_ours"
+msgstr "Перешлите мем из нашего паблика."
+
+msgid "meme.not_found"
+msgstr "Мем не найден в базе."
+
+msgid "meme.no_caption"
+msgstr "нет"
+
+msgid "meme.card"
+msgstr ""
+"Исходный паблик: <b>{source}</b>\n"
+"ID паблика: <code>{chat_id}</code>\n"
+"Исходное сообщение: {message_link}\n"
+"Скачан: {downloaded_at}\n"
+"Оригинальная дата: {created_at}\n"
+"Опубликован у нас: {posted_at_tg}\n"
+"\n"
+"ID в базе: <code>{media_id}</code>\n"
+"Тип: {media_type}\n"
+"Размер: {file_size}\n"
+"Разрешение: {dimensions}\n"
+"Длительность: {duration}\n"
+"MIME: {mime_type}\n"
+"Кодек: {video_codec}\n"
+"Кружок: {round_message}\n"
+"Автор: {sender_name} (<code>{sender_id}</code>)\n"
+"Подпись: {caption}"
+
+msgid "unknown"
+msgstr "Не понял. Откройте меню или перешлите мем из нашего паблика."
+
+msgid "common.dash"
+msgstr "—"
+
+msgid "common.yes"
+msgstr "да"
+
+msgid "common.no"
+msgstr "нет"

@@ -1,0 +1,48 @@
+from collections.abc import Mapping
+from enum import StrEnum
+
+from aiogram.filters.callback_data import CallbackData
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+
+
+class StartZone(StrEnum):
+    CHANNELS = "channels"
+    ADMINS = "admins"
+    LANGUAGE = "language"
+
+
+class OpenZoneCB(CallbackData, prefix="zone"):
+    value: StartZone
+
+
+class BackCB(CallbackData, prefix="back"):
+    pass
+
+
+def welcome_kb(*, buttons: Mapping[StartZone, str]) -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=text,
+                callback_data=OpenZoneCB(value=zone).pack(),
+            ),
+        ]
+        for zone, text in buttons.items()
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def back_kb(*, back_text: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=back_text, callback_data=BackCB().pack())],
+        ],
+    )
+
+
+def menu_reply_kb(*, menu_text: str) -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=menu_text)]],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
