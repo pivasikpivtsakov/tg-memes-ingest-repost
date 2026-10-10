@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from dataclasses import dataclass
@@ -233,3 +234,37 @@ async def leave_and_unallow(
 
     await allowed_chats.remove(chat_id=chat_id)
     return result
+
+
+async def _refresh_label(
+    client: TelegramClient,
+    allowed_chats: AllowedChatsRepository,
+    chat_id: int,
+) -> None:
+    entity = await client.get_entity(chat_id)
+    await allowed_chats.add(chat_id=chat_id, label=_label_for(entity))
+
+
+async def refresh_allowed_chat_labels(
+    client: TelegramClient,
+    allowed_chats: AllowedChatsRepository,
+) -> None:
+    chats = await allowed_chats.all()
+    for chat_id in chats:
+        try:
+            await _refresh_label(client, allowed_chats, chat_id)
+        except FloodWaitError as exc:
+            logger.warning("FloodWait %ss while refreshing label for %s", exc.seconds, chat_id)
+            if exc.seconds > 30:
+                continue
+            try:
+                await asyncio.sleep(exc.seconds)
+                await _refresh_label(client, allowed_chats, chat_id)
+            except Exception:
+                logger.warning(
+                    "Could not refresh label for %s after FloodWait",
+                    chat_id,
+                    exc_info=True,
+                )
+        except Exception:
+            logger.warning("Could not refresh label for %s", chat_id, exc_info=True)

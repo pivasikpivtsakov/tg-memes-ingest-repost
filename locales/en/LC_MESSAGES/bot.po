@@ -22,7 +22,7 @@ msgid "menu.btn_back"
 msgstr "Back"
 
 msgid "menu.btn_channels"
-msgstr "Publics"
+msgstr "Channels"
 
 msgid "menu.btn_admins"
 msgstr "Admins"
@@ -49,55 +49,58 @@ msgid "menu.btn_no"
 msgstr "No"
 
 msgid "channels.title"
-msgstr "Allowed publics"
+msgstr "Channels: {count}"
 
 msgid "channels.empty"
-msgstr "The list is empty. Add a public with the button below."
+msgstr "The list is empty. Add a channel with the button below."
 
 msgid "channels.btn_add"
-msgstr "Add public"
+msgstr "Add channel"
 
-msgid "channels.btn_delete"
-msgstr "✕"
+msgid "channels.btn_refresh"
+msgstr "Refresh names"
+
+msgid "channels.refreshing"
+msgstr "Refreshing names…"
 
 msgid "channels.add_prompt"
-msgstr "Send an @username, a t.me link, or forward any message from the public."
+msgstr "Send an @username, a t.me link, or forward any message from the channel."
 
 msgid "channels.invalid_target"
-msgstr "Could not parse that. Need an @username, t.me link, invite, or a forward from the public."
+msgstr "Could not parse that. Need an @username, t.me link, invite, or a forward from the channel."
 
 msgid "channels.preview"
-msgstr "Public: <b>{title}</b>\nUsername: {username}\nID: <code>{chat_id}</code>\n\nJoin and add to the allowlist?"
+msgstr "Channel: <b>{title}</b>\nUsername: {username}\nID: <code>{chat_id}</code>\n\nJoin and add to the allowlist?"
 
 msgid "channels.preview_invite"
 msgstr "Invite: <b>{title}</b>\n\nJoin and add to the allowlist?"
 
 msgid "channels.joining"
-msgstr "Joining the public…"
+msgstr "Joining the channel…"
 
 msgid "channels.join_failed"
-msgstr "Could not join the public."
+msgstr "Could not join the channel."
 
 msgid "channels.remove_confirm"
-msgstr "Remove <b>{label}</b> from the allowlist and leave the public?"
+msgstr "Remove <b>{label}</b> from the allowlist and leave the channel?"
 
 msgid "channels.removing"
-msgstr "Leaving the public…"
+msgstr "Leaving the channel…"
 
 msgid "channels.remove_failed"
-msgstr "Could not leave the public."
+msgstr "Could not leave the channel."
 
 msgid "channels.error_flood"
 msgstr "Telegram asks to wait {seconds}s."
 
 msgid "channels.error_not_found"
-msgstr "Public not found."
+msgstr "Channel not found."
 
 msgid "channels.error_invite"
 msgstr "Invite is invalid or expired."
 
 msgid "channels.error_private"
-msgstr "This public is private; no access."
+msgstr "This channel is private; no access."
 
 msgid "channels.error_request"
 msgstr "A join request was sent and is waiting for approval."
@@ -142,7 +145,7 @@ msgid "language.changed"
 msgstr "Language updated."
 
 msgid "meme.not_from_ours"
-msgstr "Forward a meme from our public."
+msgstr "Forward a meme from our channel."
 
 msgid "meme.not_found"
 msgstr "Meme not found in the database."
@@ -152,8 +155,8 @@ msgstr "none"
 
 msgid "meme.card"
 msgstr ""
-"Source public: <b>{source}</b>\n"
-"Source chat ID: <code>{chat_id}</code>\n"
+"Source channel: <b>{source}</b>\n"
+"Channel ID: <code>{chat_id}</code>\n"
 "Source message: {message_link}\n"
 "Downloaded: {downloaded_at}\n"
 "Original date: {created_at}\n"
@@ -171,7 +174,7 @@ msgstr ""
 "Caption: {caption}"
 
 msgid "unknown"
-msgstr "I did not get that. Open the menu or forward a meme from our public."
+msgstr "I did not get that. Open the menu or forward a meme from our channel."
 
 msgid "common.dash"
 msgstr "—"

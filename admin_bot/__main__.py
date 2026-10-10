@@ -50,6 +50,7 @@ async def main() -> None:
     finally:
         if dispatcher is not None:
             await dispatcher.storage.close()
+        await media_lookup.dispose()
         await bot.session.close()
         await redis.aclose()
 

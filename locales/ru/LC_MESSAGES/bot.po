@@ -22,7 +22,7 @@ msgid "menu.btn_back"
 msgstr "Назад"
 
 msgid "menu.btn_channels"
-msgstr "Паблики"
+msgstr "Каналы"
 
 msgid "menu.btn_admins"
 msgstr "Админы"
@@ -49,55 +49,58 @@ msgid "menu.btn_no"
 msgstr "Нет"
 
 msgid "channels.title"
-msgstr "Разрешённые паблики"
+msgstr "Каналы: {count}"
 
 msgid "channels.empty"
-msgstr "Список пуст. Добавьте паблик кнопкой ниже."
+msgstr "Список пуст. Добавьте канал кнопкой ниже."
 
 msgid "channels.btn_add"
-msgstr "Добавить паблик"
+msgstr "Добавить канал"
 
-msgid "channels.btn_delete"
-msgstr "✕"
+msgid "channels.btn_refresh"
+msgstr "Обновить названия"
+
+msgid "channels.refreshing"
+msgstr "Обновляю названия…"
 
 msgid "channels.add_prompt"
-msgstr "Пришлите @username, ссылку t.me или перешлите любое сообщение из паблика."
+msgstr "Пришлите @username, ссылку t.me или перешлите любое сообщение из канала."
 
 msgid "channels.invalid_target"
-msgstr "Не понял цель. Нужен @username, ссылка t.me, инвайт или пересылка из паблика."
+msgstr "Не понял цель. Нужен @username, ссылка t.me, инвайт или пересылка из канала."
 
 msgid "channels.preview"
-msgstr "Паблик: <b>{title}</b>\nUsername: {username}\nID: <code>{chat_id}</code>\n\nВступить и добавить в allowlist?"
+msgstr "Канал: <b>{title}</b>\nUsername: {username}\nID: <code>{chat_id}</code>\n\nВступить и добавить в allowlist?"
 
 msgid "channels.preview_invite"
 msgstr "Инвайт: <b>{title}</b>\n\nВступить и добавить в allowlist?"
 
 msgid "channels.joining"
-msgstr "Вступаю в паблик…"
+msgstr "Вступаю в канал…"
 
 msgid "channels.join_failed"
-msgstr "Не удалось вступить в паблик."
+msgstr "Не удалось вступить в канал."
 
 msgid "channels.remove_confirm"
-msgstr "Удалить <b>{label}</b> из allowlist и выйти из паблика?"
+msgstr "Удалить <b>{label}</b> из allowlist и выйти из канала?"
 
 msgid "channels.removing"
-msgstr "Выхожу из паблика…"
+msgstr "Выхожу из канала…"
 
 msgid "channels.remove_failed"
-msgstr "Не удалось выйти из паблика."
+msgstr "Не удалось выйти из канала."
 
 msgid "channels.error_flood"
 msgstr "Telegram просит подождать {seconds} с."
 
 msgid "channels.error_not_found"
-msgstr "Паблик не найден."
+msgstr "Канал не найден."
 
 msgid "channels.error_invite"
 msgstr "Инвайт недействителен или истёк."
 
 msgid "channels.error_private"
-msgstr "Паблик приватный, нет доступа."
+msgstr "Канал приватный, нет доступа."
 
 msgid "channels.error_request"
 msgstr "Заявка на вступление отправлена и ждёт одобрения."
@@ -142,7 +145,7 @@ msgid "language.changed"
 msgstr "Язык обновлён."
 
 msgid "meme.not_from_ours"
-msgstr "Перешлите мем из нашего паблика."
+msgstr "Перешлите мем из нашего канала."
 
 msgid "meme.not_found"
 msgstr "Мем не найден в базе."
@@ -152,8 +155,8 @@ msgstr "нет"
 
 msgid "meme.card"
 msgstr ""
-"Исходный паблик: <b>{source}</b>\n"
-"ID паблика: <code>{chat_id}</code>\n"
+"Исходный канал: <b>{source}</b>\n"
+"ID канала: <code>{chat_id}</code>\n"
 "Исходное сообщение: {message_link}\n"
 "Скачан: {downloaded_at}\n"
 "Оригинальная дата: {created_at}\n"
@@ -171,7 +174,7 @@ msgstr ""
 "Подпись: {caption}"
 
 msgid "unknown"
-msgstr "Не понял. Откройте меню или перешлите мем из нашего паблика."
+msgstr "Не понял. Откройте меню или перешлите мем из нашего канала."
 
 msgid "common.dash"
 msgstr "—"

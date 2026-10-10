@@ -1,4 +1,5 @@
 import logging
+import re
 from html import escape
 
 from aiogram import F, Router
@@ -17,17 +18,19 @@ from telethon.errors import (
     UsernameNotOccupiedError,
 )
 
-from admin_bot.constants import CHANNEL_PAGE_SIZE
-from admin_bot.forms.menu import show_panel
+from admin_bot.forms.menu import (
+    clear_extra_messages,
+    remember_panel_messages,
+    show_panel,
+    show_panel_from_chat,
+)
 from admin_bot.forms.states import AddChannel
 from admin_bot.keyboards.channels import (
     ChannelAddCB,
     ChannelCancelCB,
-    ChannelDeleteCB,
     ChannelDeleteConfirmCB,
     ChannelJoinConfirmCB,
-    ChannelLabelCB,
-    ChannelPageCB,
+    ChannelRefreshCB,
     channel_cancel_kb,
     channel_confirm_kb,
     channel_delete_confirm_kb,
@@ -35,6 +38,8 @@ from admin_bot.keyboards.channels import (
 )
 from admin_bot.keyboards.start import OpenZoneCB, StartZone
 from admin_bot.services.meme import is_from_our_public, is_our_public_chat, source_channel_from_message
+from admin_bot.utils.telegram import ignore_message_gone, ignore_not_modified
+from shared.redis import AllowedChatsRepository
 from shared.services import (
     ChannelResult,
     ChannelTarget,
@@ -42,16 +47,17 @@ from shared.services import (
     join_and_allow,
     leave_and_unallow,
     parse_channel_target,
+    refresh_allowed_chat_labels,
     resolve_channel,
 )
-from shared.redis import AllowedChatsRepository
 
 logger = logging.getLogger(__name__)
 router = Router(name="channels")
 
 _JOIN_KIND = "join_kind"
 _JOIN_VALUE = "join_value"
-_LIST_OFFSET = "channels_offset"
+_TG_TEXT_LIMIT = 4096
+_CHDEL_RE = re.compile(r"^/chdel_m(\d+)(?:@\w+)?$")
 
 
 class IsAddChannelInput(BaseFilter):
@@ -60,7 +66,19 @@ class IsAddChannelInput(BaseFilter):
             return False
         if source_channel_from_message(message) is not None:
             return True
-        return bool(message.text)
+        text = message.text
+        if text and text.startswith("/"):
+            return False
+        return bool(text)
+
+
+class ChannelDeleteCommand(BaseFilter):
+    async def __call__(self, message: Message) -> dict | bool:
+        text = (message.text or "").strip()
+        matched = _CHDEL_RE.fullmatch(text)
+        if matched is None:
+            return False
+        return {"delete_chat_id": -int(matched.group(1))}
 
 
 def channel_error_text(exc: BaseException, *, fallback: str = "channels.join_failed") -> str:
@@ -77,35 +95,43 @@ def channel_error_text(exc: BaseException, *, fallback: str = "channels.join_fai
     return _(fallback)
 
 
-def _sorted_items(chats: dict[int, str]) -> list[tuple[int, str]]:
-    return sorted(chats.items(), key=lambda item: item[1].lower())
+def _delete_command(chat_id: int) -> str:
+    return f"/chdel_m{abs(chat_id)}"
 
 
-def _list_view(*, chats: dict[int, str], offset: int):
-    items = _sorted_items(chats)
-    if offset >= len(items) and offset > 0:
-        offset = max(0, ((len(items) - 1) // CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE)
-    page = items[offset:offset + CHANNEL_PAGE_SIZE]
-    if not items:
-        text = f"{_('channels.title')}\n\n{_('channels.empty')}"
-    else:
-        lines = [
-            f"{idx}. {escape(label)}\n<code>{chat_id}</code>"
-            for idx, (chat_id, label) in enumerate(page, start=offset + 1)
-        ]
-        text = f"{_('channels.title')}\n\n" + "\n".join(lines)
-    markup = channels_kb(
-        items=page,
-        offset=offset,
-        page_size=CHANNEL_PAGE_SIZE,
-        total=len(items),
+def _channel_block(index: int, chat_id: int, label: str) -> str:
+    return f"{index}. {escape(label)}\n{_delete_command(chat_id)}"
+
+
+def _list_chunks(chats: dict[int, str]) -> list[str]:
+    title = _("channels.title").format(count=len(chats))
+    if not chats:
+        return [f"{title}\n\n{_('channels.empty')}"]
+
+    chunks: list[str] = []
+    current = title
+    for index, (chat_id, label) in enumerate(chats.items(), start=1):
+        block = _channel_block(index, chat_id, label)
+        if len(block) > _TG_TEXT_LIMIT:
+            block = block[:_TG_TEXT_LIMIT]
+        joined = f"{current}\n\n{block}" if current == title else f"{current}\n{block}"
+        if len(joined) <= _TG_TEXT_LIMIT:
+            current = joined
+            continue
+        if current:
+            chunks.append(current)
+        current = block
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _channels_markup():
+    return channels_kb(
         add_text=_("channels.btn_add"),
-        delete_text=_("channels.btn_delete"),
-        prev_text=_("menu.btn_prev"),
-        next_text=_("menu.btn_next"),
+        refresh_text=_("channels.btn_refresh"),
         back_text=_("menu.btn_back"),
     )
-    return text, markup, offset
 
 
 async def _show_list(
@@ -113,14 +139,66 @@ async def _show_list(
     callback: CallbackQuery,
     state: FSMContext,
     allowed_chats: AllowedChatsRepository,
-    offset: int = 0,
     answer: bool = True,
 ) -> None:
     await state.set_state(None)
+    if not isinstance(callback.message, Message):
+        if answer:
+            await callback.answer()
+        return
     chats = await allowed_chats.all()
-    text, markup, offset = _list_view(chats=chats, offset=offset)
-    await state.update_data({_LIST_OFFSET: offset})
-    await show_panel(callback=callback, text=text, markup=markup, state=state, answer=answer)
+    chunks = _list_chunks(chats)
+    markup = _channels_markup()
+    await clear_extra_messages(
+        bot=callback.message.bot,
+        chat_id=callback.message.chat.id,
+        state=state,
+    )
+    first_markup = markup if len(chunks) == 1 else None
+    with ignore_not_modified():
+        await callback.message.edit_text(chunks[0], reply_markup=first_markup)
+    extra_ids: list[int] = []
+    menu_id = callback.message.message_id
+    if len(chunks) > 1:
+        extra_ids.append(menu_id)
+        for index, chunk in enumerate(chunks[1:]):
+            is_last = index == len(chunks) - 2
+            sent = await callback.message.answer(
+                chunk,
+                reply_markup=markup if is_last else None,
+            )
+            if is_last:
+                menu_id = sent.message_id
+            else:
+                extra_ids.append(sent.message_id)
+    await remember_panel_messages(state=state, menu_id=menu_id, extra_ids=extra_ids)
+    if answer:
+        await callback.answer()
+
+
+@router.message(ChannelDeleteCommand())
+async def confirm_delete_from_command(
+    message: Message,
+    state: FSMContext,
+    allowed_chats: AllowedChatsRepository,
+    delete_chat_id: int,
+) -> None:
+    with ignore_message_gone():
+        await message.delete()
+    await state.set_state(None)
+    chats = await allowed_chats.all()
+    label = chats.get(delete_chat_id, str(delete_chat_id))
+    await show_panel_from_chat(
+        bot=message.bot,
+        chat_id=message.chat.id,
+        state=state,
+        text=_("channels.remove_confirm").format(label=escape(label)),
+        markup=channel_delete_confirm_kb(
+            chat_id=delete_chat_id,
+            yes_text=_("menu.btn_yes"),
+            no_text=_("menu.btn_no"),
+        ),
+    )
 
 
 @router.callback_query(OpenZoneCB.filter(F.value == StartZone.CHANNELS))
@@ -130,26 +208,6 @@ async def open_channels(
     allowed_chats: AllowedChatsRepository,
 ) -> None:
     await _show_list(callback=callback, state=state, allowed_chats=allowed_chats)
-
-
-@router.callback_query(ChannelLabelCB.filter())
-async def ignore_channel_label(callback: CallbackQuery) -> None:
-    await callback.answer()
-
-
-@router.callback_query(ChannelPageCB.filter())
-async def paginate_channels(
-    callback: CallbackQuery,
-    callback_data: ChannelPageCB,
-    state: FSMContext,
-    allowed_chats: AllowedChatsRepository,
-) -> None:
-    await _show_list(
-        callback=callback,
-        state=state,
-        allowed_chats=allowed_chats,
-        offset=callback_data.offset,
-    )
 
 
 @router.callback_query(ChannelAddCB.filter())
@@ -163,40 +221,42 @@ async def start_add_channel(callback: CallbackQuery, state: FSMContext) -> None:
     )
 
 
+@router.callback_query(ChannelRefreshCB.filter())
+async def refresh_channel_labels(
+    callback: CallbackQuery,
+    state: FSMContext,
+    allowed_chats: AllowedChatsRepository,
+    tg_client: TelegramClient,
+) -> None:
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await clear_extra_messages(
+            bot=callback.message.bot,
+            chat_id=callback.message.chat.id,
+            state=state,
+        )
+        with ignore_not_modified():
+            await callback.message.edit_text(_("channels.refreshing"), reply_markup=None)
+        await remember_panel_messages(state=state, menu_id=callback.message.message_id)
+    try:
+        await refresh_allowed_chat_labels(tg_client, allowed_chats)
+    except Exception as exc:
+        logger.warning("Failed to refresh channel labels: %s", exc)
+    await _show_list(
+        callback=callback,
+        state=state,
+        allowed_chats=allowed_chats,
+        answer=False,
+    )
+
+
 @router.callback_query(ChannelCancelCB.filter())
 async def cancel_channel_flow(
     callback: CallbackQuery,
     state: FSMContext,
     allowed_chats: AllowedChatsRepository,
 ) -> None:
-    data = await state.get_data()
-    await _show_list(
-        callback=callback,
-        state=state,
-        allowed_chats=allowed_chats,
-        offset=int(data.get(_LIST_OFFSET) or 0),
-    )
-
-
-@router.callback_query(ChannelDeleteCB.filter())
-async def confirm_delete_channel(
-    callback: CallbackQuery,
-    callback_data: ChannelDeleteCB,
-    state: FSMContext,
-    allowed_chats: AllowedChatsRepository,
-) -> None:
-    chats = await allowed_chats.all()
-    label = chats.get(callback_data.chat_id, str(callback_data.chat_id))
-    await show_panel(
-        callback=callback,
-        text=_("channels.remove_confirm").format(label=escape(label)),
-        markup=channel_delete_confirm_kb(
-            chat_id=callback_data.chat_id,
-            yes_text=_("menu.btn_yes"),
-            no_text=_("menu.btn_no"),
-        ),
-        state=state,
-    )
+    await _show_list(callback=callback, state=state, allowed_chats=allowed_chats)
 
 
 @router.callback_query(ChannelDeleteConfirmCB.filter())
@@ -219,12 +279,10 @@ async def delete_channel(
                 channel_error_text(exc, fallback="channels.remove_failed"),
             )
         return
-    data = await state.get_data()
     await _show_list(
         callback=callback,
         state=state,
         allowed_chats=allowed_chats,
-        offset=int(data.get(_LIST_OFFSET) or 0),
         answer=False,
     )
 
