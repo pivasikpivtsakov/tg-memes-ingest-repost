@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from pydantic import BaseModel
 import boto3
 from botocore.exceptions import ClientError
-from sqlalchemy import func, select, insert, update
+from sqlalchemy import delete, func, insert, select, text, update
 
 from shared.db import Media, DatabaseManager
 
@@ -291,3 +291,36 @@ class MediaStorage:
             else:
                 logger.warning(f"Media #{media_id} not found")
             return updated
+
+    def find_media_by_where(self, where_expr: str) -> list[MediaMetadata]:
+        """Return media rows matching a raw SQL WHERE clause against `medias`."""
+        where_expr = where_expr.strip()
+        if not where_expr:
+            raise ValueError("WHERE expression must not be empty")
+        if ";" in where_expr:
+            raise ValueError("WHERE expression must be a single clause")
+
+        with self._get_session() as session:
+            stmt = select(Media).where(text(f"({where_expr})")).order_by(Media.id.asc())
+            results = session.execute(stmt).scalars().all()
+            return [MediaMetadata.model_validate(media) for media in results]
+
+    def delete_minio_object(self, file_path: str) -> None:
+        """Delete an object from MinIO. S3 delete is idempotent if the key is already gone."""
+        try:
+            self.s3_client.delete_object(Bucket=self.minio_bucket, Key=file_path)
+        except ClientError as e:
+            logger.error(f"Error deleting MinIO object {file_path}: {e}")
+            raise
+        logger.info(f"Deleted MinIO object: {file_path}")
+
+    def delete_media_row(self, media_id: int) -> bool:
+        """Delete a media metadata row. Returns True if a row was removed."""
+        with self._get_session() as session:
+            result = session.execute(delete(Media).where(Media.id == media_id))
+            deleted = result.rowcount > 0
+            if deleted:
+                logger.info(f"Media #{media_id} deleted from database")
+            else:
+                logger.warning(f"Media #{media_id} not found in database")
+            return deleted
