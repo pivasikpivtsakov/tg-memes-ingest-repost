@@ -33,23 +33,22 @@ class TelegramSenderApp(AbstractSenderApp):
                 include_caption=self.config.include_caption
             )
             
-            result = await sender.send_memes(count=self.config.memes_per_run)
+            sent = await sender.send_meme()
             
-            if result.no_unsent_memes:
+            if sent is None:
                 logger.info("No memes to send. Exiting.")
                 return 0
             
-            if result.sent_successfully > 0:
-                logger.info(f"Successfully sent {result.sent_successfully} meme(s). Exiting.")
+            if sent:
+                logger.info("Successfully sent a meme. Exiting.")
                 return 0
-            else:
-                logger.error(f"Failed to send any memes ({result.failed} failures). Exiting.")
-                return 1
+
+            logger.error("Failed to send the meme. Exiting.")
+            return 1
 
     def _log_startup_info(self) -> None:
         logger.info("Memes Sender App Starting")
         logger.info(f"Target channel: {self.config.target_chat_id}")
-        logger.info(f"Memes per run: {self.config.memes_per_run}")
         logger.info(f"Include caption: {self.config.include_caption}")
 
 

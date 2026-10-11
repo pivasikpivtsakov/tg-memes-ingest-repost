@@ -226,22 +226,20 @@ class MediaStorage:
 
     async def get_unsent_media(
         self, 
-        limit: int = 10, 
         media_type: Optional[MediaType] = None,
         order_by: str | None = None,
         order_direction: str = 'ASC'
-    ) -> list[MediaMetadata]:
+    ) -> MediaMetadata | None:
         """
-        Get unsent media with configurable ordering and optional media type filtering.
+        Get one unsent media item with configurable ordering and optional media type filtering.
         
         Args:
-            limit: Maximum number of media items to return
             media_type: Filter by "photo" or "video", or None for both
             order_by: Column to order by (e.g., 'downloaded_at', 'created_at', 'file_size') or None to shuffle
             order_direction: 'ASC' for ascending (oldest first) or 'DESC' for descending
             
         Returns:
-            List of unsent media metadata, ordered as specified
+            One unsent media metadata item, or None if there is none
             
         Note:
             This is an internal method - order_by and order_direction are not validated
@@ -262,10 +260,13 @@ class MediaStorage:
                 else:
                     stmt = stmt.order_by(order_column.asc())
             
-            stmt = stmt.limit(limit)
+            stmt = stmt.limit(1)
             
             results = await session.execute(stmt)
-            return [MediaMetadata.model_validate(media) for media in results.scalars().all()]
+            media = results.scalar_one_or_none()
+            if media is None:
+                return None
+            return MediaMetadata.model_validate(media)
     
     async def mark_media_as_sent(self, media_id: int) -> bool:
         """Mark a media item as sent to the Telegram target channel."""

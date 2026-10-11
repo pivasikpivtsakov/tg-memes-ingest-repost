@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from io import BytesIO
-from dataclasses import dataclass
 
 from telethon import TelegramClient
 from telethon.errors import FloodWaitError, FileReferenceExpiredError, MediaEmptyError
@@ -11,22 +10,6 @@ from sender_tg_app.services.video_thumbnail import generate_video_thumbnail, nee
 from shared.storage import MediaStorage, MediaMetadata
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class SendResult:
-    """Result of sending a batch of memes."""
-    total_requested: int
-    sent_successfully: int
-    failed: int
-    no_unsent_memes: bool
-    
-    @property
-    def success_rate(self) -> float:
-        """Calculate success rate as percentage."""
-        if self.total_requested == 0:
-            return 0.0
-        return (self.sent_successfully / self.total_requested) * 100
 
 
 class MemesSender:
@@ -58,64 +41,25 @@ class MemesSender:
                 raise
         return self._resolved_entity
     
-    async def send_memes(self, count: int = 1) -> SendResult:
+    async def send_meme(self) -> bool | None:
         """
-        Send N unsent memes (photos and videos) to the configured channel.
-        
-        Args:
-            count: Number of memes to send (default: 1)
-            
+        Send one unsent meme to the configured channel.
+
         Returns:
-            SendResult with statistics about the operation
+            True if sent, False if send failed, None if there is nothing to send.
         """
-        logger.info(f"Attempting to send {count} meme(s) to {self.target_chat_id}")
+        logger.info(f"Attempting to send a meme to {self.target_chat_id}")
         
         await self._ensure_entity_resolved()
 
-        unsent_media = await self.storage.get_unsent_media(limit=count)
+        media = await self.storage.get_unsent_media()
 
-        if not unsent_media:
+        if media is None:
             logger.info("No unsent memes found in database")
-            return SendResult(
-                total_requested=count,
-                sent_successfully=0,
-                failed=0,
-                no_unsent_memes=True
-            )
-        
-        logger.info(
-            f"Found {len(unsent_media)} unsent meme(s) to send "
-            f"({sum(1 for m in unsent_media if m.media_type == 'photo')} photos, "
-            f"{sum(1 for m in unsent_media if m.media_type == 'video')} videos)"
-        )
-        
-        sent_successfully = 0
-        failed = 0
-        
-        for media in unsent_media:
-            try:
-                success = await self._send_single_meme(media)
-                if success:
-                    sent_successfully += 1
-                else:
-                    failed += 1
-            except Exception as e:
-                logger.error(f"Unexpected error sending {media.media_type} #{media.id}: {e}", exc_info=True)
-                failed += 1
-        
-        result = SendResult(
-            total_requested=count,
-            sent_successfully=sent_successfully,
-            failed=failed,
-            no_unsent_memes=False
-        )
-        
-        logger.info(
-            f"Sending complete: {sent_successfully}/{len(unsent_media)} successful, "
-            f"{failed} failed ({result.success_rate:.1f}% success rate)"
-        )
-        
-        return result
+            return None
+
+        logger.info(f"Found unsent {media.media_type} #{media.id} to send")
+        return await self._send_single_meme(media)
     
     async def _build_own_thumbnail_if_needed(self, media: MediaMetadata, media_data: bytes) -> BytesIO | None:
         if not needs_own_thumbnail(len(media_data)):
