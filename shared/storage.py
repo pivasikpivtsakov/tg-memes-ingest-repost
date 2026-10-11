@@ -32,6 +32,8 @@ class MediaMetadata(BaseModel):
     chat_title: Optional[str] = None
     caption: Optional[str] = None
     telegram_id: Optional[int] = None
+    grouped_id: Optional[int] = None
+    album_position: Optional[int] = None
     file_size: Optional[int] = None
     width: Optional[int] = None
     height: Optional[int] = None
@@ -150,7 +152,9 @@ class MediaStorage:
         file_extension: Optional[str] = None,
         created_at: Optional[datetime] = None,
         video_codec: Optional[str] = None,
-        round_message: Optional[bool] = None
+        round_message: Optional[bool] = None,
+        grouped_id: Optional[int] = None,
+        album_position: Optional[int] = None
     ) -> tuple[str, bool]:
         """
         Save media (photo or video) to MinIO with flat structure and metadata tracking.
@@ -217,7 +221,9 @@ class MediaStorage:
                 mime_type=mime_type,
                 created_at=created_at,
                 video_codec=video_codec,
-                round_message=round_message
+                round_message=round_message,
+                grouped_id=grouped_id,
+                album_position=album_position
             )
             await session.execute(stmt)
         
@@ -283,6 +289,42 @@ class MediaStorage:
             else:
                 logger.warning(f"Media #{media_id} not found")
             return updated
+
+    async def mark_medias_as_sent(self, media_ids: list[int]) -> int:
+        """Mark multiple media items as sent to the Telegram target channel."""
+        if not media_ids:
+            return 0
+        async with self._db.get_session() as session:
+            stmt = update(Media).where(Media.id.in_(media_ids)).values(
+                is_sent_tg=True,
+                posted_at_tg=func.current_timestamp(),
+            )
+            result = await session.execute(stmt)
+            updated = result.rowcount or 0
+            if updated:
+                logger.info(f"Media {media_ids} marked as sent")
+            else:
+                logger.warning(f"Media {media_ids} not found")
+            return updated
+
+    async def get_unsent_album_siblings(
+        self,
+        chat_id: int,
+        grouped_id: int,
+    ) -> list[MediaMetadata]:
+        """Unsent media rows that belong to the same Telegram album."""
+        async with self._db.get_session() as session:
+            stmt = (
+                select(Media)
+                .where(
+                    Media.chat_id == chat_id,
+                    Media.grouped_id == grouped_id,
+                    Media.is_sent_tg == False,
+                )
+                .order_by(Media.album_position.asc(), Media.id.asc())
+            )
+            results = await session.execute(stmt)
+            return [MediaMetadata.model_validate(media) for media in results.scalars().all()]
 
     async def find_media_by_where(self, where_expr: str) -> list[MediaMetadata]:
         """Return media rows matching a raw SQL WHERE clause against `medias`."""

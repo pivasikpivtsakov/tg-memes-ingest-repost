@@ -59,6 +59,25 @@ class MemesSender:
             return None
 
         logger.info(f"Found unsent {media.media_type} #{media.id} to send")
+        return await self._send_media(media)
+
+    async def _send_media(self, media: MediaMetadata) -> bool:
+        """Send a standalone media item or the unsent remainder of its album."""
+        if media.grouped_id is None:
+            return await self._send_single_meme(media)
+
+        siblings = await self.storage.get_unsent_album_siblings(
+            chat_id=media.chat_id,
+            grouped_id=media.grouped_id,
+        )
+        if len(siblings) >= 2:
+            logger.info(
+                f"Sending album grouped_id={media.grouped_id} "
+                f"({len(siblings)} unsent items)"
+            )
+            return await self._send_album(siblings)
+        if len(siblings) == 1:
+            return await self._send_single_meme(siblings[0])
         return await self._send_single_meme(media)
     
     async def _build_own_thumbnail_if_needed(self, media: MediaMetadata, media_data: bytes) -> BytesIO | None:
@@ -183,6 +202,74 @@ class MemesSender:
             # Generic error - don't mark as sent, allow retry
             logger.error(
                 f"Failed to send {media_type} #{media.id}: {e}. "
+                f"NOT marked as sent, will retry on next run."
+            )
+            return False
+
+    async def _send_album(self, medias: list[MediaMetadata]) -> bool:
+        """Send unsent album items together. MinIO failures are skipped like singles."""
+        file_buffers: list[BytesIO] = []
+        attempt_ids: list[int] = []
+
+        for media in medias:
+            try:
+                media_data = self.storage.get_media_data(media.file_path)
+            except Exception as e:
+                logger.warning(
+                    f"{media.media_type.capitalize()} #{media.id} could not be retrieved from MinIO "
+                    f"(key: {media.file_path}): {e}. Marking as sent to avoid retrying"
+                )
+                await self.storage.mark_media_as_sent(media.id)
+                continue
+
+            file_buffer = BytesIO(media_data)
+            file_buffer.name = media.file_path
+            file_buffers.append(file_buffer)
+            attempt_ids.append(media.id)
+
+        if not file_buffers:
+            return False
+        if len(file_buffers) == 1:
+            remaining = next(media for media in medias if media.id == attempt_ids[0])
+            return await self._send_single_meme(remaining)
+
+        ids_preview = ", ".join(f"#{media_id}" for media_id in attempt_ids)
+        logger.info(
+            f"Sending album ({len(file_buffers)} files: {ids_preview}) "
+            f"to {self.target_chat_id}"
+        )
+
+        try:
+            await self.client.send_file(
+                entity=self._resolved_entity,
+                file=file_buffers,
+                force_document=False,
+                supports_streaming=True,
+            )
+            await self.storage.mark_medias_as_sent(attempt_ids)
+            logger.info(
+                f"✓ Successfully sent album ({ids_preview}) to {self.target_chat_id}"
+            )
+            return True
+
+        except FloodWaitError as e:
+            logger.error(
+                f"FloodWaitError: Telegram requires waiting {e.seconds} seconds. "
+                f"Album ({ids_preview}) NOT marked as sent. Please try again later."
+            )
+            return False
+
+        except (FileReferenceExpiredError, MediaEmptyError) as e:
+            logger.error(
+                f"Telegram media error for album ({ids_preview}): {e}. "
+                f"Marking as sent to avoid retries."
+            )
+            await self.storage.mark_medias_as_sent(attempt_ids)
+            return False
+
+        except Exception as e:
+            logger.error(
+                f"Failed to send album ({ids_preview}): {e}. "
                 f"NOT marked as sent, will retry on next run."
             )
             return False

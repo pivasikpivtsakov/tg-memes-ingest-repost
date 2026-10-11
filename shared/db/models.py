@@ -6,7 +6,7 @@ from typing import Optional, Literal
 
 from sqlalchemy import String, Integer, BigInteger, Boolean, Text, CheckConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 
 from shared.db.base import Base
 
@@ -80,6 +80,16 @@ class Media(Base):
         BigInteger, 
         nullable=True,
         comment="Telegram's internal ID for the media file"
+    )
+    grouped_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        nullable=True,
+        comment="Telegram album grouped_id; NULL for standalone media"
+    )
+    album_position: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Order of this media inside the album"
     )
     
     # File properties
@@ -172,6 +182,12 @@ class Media(Base):
         Index('idx_is_sent', 'is_sent_tg'),
         Index('idx_is_sent_media_type', 'is_sent_tg', 'media_type'),
         Index('idx_posted_at_tg', 'posted_at_tg'),
+        Index(
+            'idx_medias_album',
+            'chat_id',
+            'grouped_id',
+            postgresql_where=text('grouped_id IS NOT NULL'),
+        ),
     )
     
     def __repr__(self) -> str:

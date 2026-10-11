@@ -26,7 +26,7 @@ async def main(media_id: int, target_chat_id: str) -> None:
                 include_caption=config.include_caption,
             )
             await sender._ensure_entity_resolved()
-            success = await sender._send_single_meme(media)
+            success = await sender._send_media(media)
         print(f"media #{media_id} sent: {success}")
     finally:
         await storage.dispose()
