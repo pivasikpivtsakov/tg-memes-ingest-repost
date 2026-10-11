@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Delete media from MinIO and the database using a SQL WHERE clause."""
 import argparse
+import asyncio
 import logging
 import sys
 from pathlib import Path
@@ -63,7 +64,7 @@ def confirm_delete(count: int) -> bool:
     return answer in {"y", "yes"}
 
 
-def delete_items(storage: MediaStorage, items: list[MediaMetadata]) -> int:
+async def delete_items(storage: MediaStorage, items: list[MediaMetadata]) -> int:
     deleted = 0
     failed = 0
     for media in items:
@@ -74,7 +75,7 @@ def delete_items(storage: MediaStorage, items: list[MediaMetadata]) -> int:
             failed += 1
             print(f"minio FAILED: {exc} (db row kept)")
             continue
-        if storage.delete_media_row(media.id):
+        if await storage.delete_media_row(media.id):
             deleted += 1
             print("minio ok, db ok")
         else:
@@ -84,7 +85,7 @@ def delete_items(storage: MediaStorage, items: list[MediaMetadata]) -> int:
     return 1 if failed else 0
 
 
-def main() -> int:
+async def main() -> int:
     parser = argparse.ArgumentParser(
         description="List media matching a SQL WHERE clause, then delete them from MinIO and the database."
     )
@@ -100,21 +101,24 @@ def main() -> int:
     setup_logging(logging.WARNING)
     storage = build_storage()
     try:
-        items = storage.find_media_by_where(args.where)
-    except Exception as exc:
-        print(f"Query failed: {exc}")
-        return 1
+        try:
+            items = await storage.find_media_by_where(args.where)
+        except Exception as exc:
+            print(f"Query failed: {exc}")
+            return 1
 
-    if not items:
-        print("No media matched the WHERE expression.")
-        return 0
+        if not items:
+            print("No media matched the WHERE expression.")
+            return 0
 
-    print_media_list(items, args.where)
-    if not confirm_delete(len(items)):
-        print("Aborted.")
-        return 0
-    return delete_items(storage, items)
+        print_media_list(items, args.where)
+        if not confirm_delete(len(items)):
+            print("Aborted.")
+            return 0
+        return await delete_items(storage, items)
+    finally:
+        await storage.dispose()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(asyncio.run(main()))

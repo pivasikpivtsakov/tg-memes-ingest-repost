@@ -5,6 +5,7 @@ from telethon import TelegramClient
 
 from ingestion_app.config import config
 from ingestion_app.handlers import register_handlers
+from ingestion_app.handlers.message import media_storage
 from shared.logger import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,8 @@ async def main() -> None:
     except Exception as e:
         logger.error(f"Error in main loop: {e}", exc_info=True)
         raise
+    finally:
+        await media_storage.dispose()
 
 
 def run() -> None:

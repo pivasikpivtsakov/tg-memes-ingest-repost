@@ -6,14 +6,13 @@ import hashlib
 import logging
 from datetime import datetime
 from typing import Optional, Literal
-from contextlib import contextmanager
 
 from pydantic import BaseModel
 import boto3
 from botocore.exceptions import ClientError
 from sqlalchemy import delete, func, insert, select, text, update
 
-from shared.db import Media, DatabaseManager
+from shared.db import AsyncDatabaseManager, Media
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,7 @@ class MediaStorage:
         self.database_url = database_url
         self.minio_bucket = minio_bucket
         
-        self.db_manager = DatabaseManager(database_url)
+        self._db = AsyncDatabaseManager(database_url)
         
         self.s3_client = boto3.client(
             's3',
@@ -87,13 +86,10 @@ class MediaStorage:
             region_name='us-east-1'  # MinIO doesn't care about region but boto3 requires it
         )
         
-        self._init_database()
         self._init_minio_bucket()
-    
-    def _init_database(self) -> None:
-        """Initialize PostgreSQL database with SQLAlchemy ORM."""
-        self.db_manager.init_db()
-        logger.info("PostgreSQL database initialized with SQLAlchemy ORM")
+
+    async def dispose(self) -> None:
+        await self._db.dispose()
     
     def _init_minio_bucket(self) -> None:
         """Initialize MinIO bucket if it doesn't exist."""
@@ -109,12 +105,6 @@ class MediaStorage:
             else:
                 logger.error(f"Error checking MinIO bucket: {e}")
                 raise
-    
-    @contextmanager
-    def _get_session(self):
-        """Context manager for database sessions."""
-        with self.db_manager.get_session() as session:
-            yield session
     
     def _calculate_hash(self, data: bytes) -> str:
         """Calculate SHA256 hash of photo data."""
@@ -142,7 +132,7 @@ class MediaStorage:
         response = self.s3_client.get_object(Bucket=self.minio_bucket, Key=file_path)
         return response['Body'].read()
     
-    def save_media(
+    async def save_media(
         self,
         media_type: MediaType,
         media_data: bytes,
@@ -179,12 +169,13 @@ class MediaStorage:
         file_size = len(media_data)
         
         # Check for duplicates
-        with self._get_session() as session:
+        async with self._db.get_session() as session:
             stmt = select(Media.file_path).where(Media.file_hash == file_hash)
-            result = session.execute(stmt).first()
+            result = await session.execute(stmt)
+            row = result.first()
             
-            if result:
-                existing_path = result[0]
+            if row:
+                existing_path = row[0]
                 logger.info(f"Duplicate {media_type} detected (hash: {file_hash[:8]}...)")
                 return existing_path, True
         
@@ -207,7 +198,7 @@ class MediaStorage:
             logger.error(f"Error uploading {media_type} to MinIO: {e}")
             raise
         
-        with self._get_session() as session:
+        async with self._db.get_session() as session:
             stmt = insert(Media).values(
                 media_type=media_type,
                 file_hash=file_hash,
@@ -228,12 +219,12 @@ class MediaStorage:
                 video_codec=video_codec,
                 round_message=round_message
             )
-            session.execute(stmt)
+            await session.execute(stmt)
         
         logger.info(f"{media_type.capitalize()} saved to MinIO: {s3_key} (hash: {file_hash[:8]}...)")
         return s3_key, False
 
-    def get_unsent_media(
+    async def get_unsent_media(
         self, 
         limit: int = 10, 
         media_type: Optional[MediaType] = None,
@@ -256,7 +247,7 @@ class MediaStorage:
             This is an internal method - order_by and order_direction are not validated
             as they are never exposed to user input.
         """
-        with self._get_session() as session:
+        async with self._db.get_session() as session:
             stmt = select(Media).where(Media.is_sent_tg == False)
             
             if media_type:
@@ -273,17 +264,17 @@ class MediaStorage:
             
             stmt = stmt.limit(limit)
             
-            results = session.execute(stmt).scalars().all()
-            return [MediaMetadata.model_validate(media) for media in results]
+            results = await session.execute(stmt)
+            return [MediaMetadata.model_validate(media) for media in results.scalars().all()]
     
-    def mark_media_as_sent(self, media_id: int) -> bool:
+    async def mark_media_as_sent(self, media_id: int) -> bool:
         """Mark a media item as sent to the Telegram target channel."""
-        with self._get_session() as session:
+        async with self._db.get_session() as session:
             stmt = update(Media).where(Media.id == media_id).values(
                 is_sent_tg=True,
                 posted_at_tg=func.current_timestamp(),
             )
-            result = session.execute(stmt)
+            result = await session.execute(stmt)
             
             updated = result.rowcount > 0
             if updated:
@@ -292,7 +283,7 @@ class MediaStorage:
                 logger.warning(f"Media #{media_id} not found")
             return updated
 
-    def find_media_by_where(self, where_expr: str) -> list[MediaMetadata]:
+    async def find_media_by_where(self, where_expr: str) -> list[MediaMetadata]:
         """Return media rows matching a raw SQL WHERE clause against `medias`."""
         where_expr = where_expr.strip()
         if not where_expr:
@@ -300,10 +291,10 @@ class MediaStorage:
         if ";" in where_expr:
             raise ValueError("WHERE expression must be a single clause")
 
-        with self._get_session() as session:
+        async with self._db.get_session() as session:
             stmt = select(Media).where(text(f"({where_expr})")).order_by(Media.id.asc())
-            results = session.execute(stmt).scalars().all()
-            return [MediaMetadata.model_validate(media) for media in results]
+            results = await session.execute(stmt)
+            return [MediaMetadata.model_validate(media) for media in results.scalars().all()]
 
     def delete_minio_object(self, file_path: str) -> None:
         """Delete an object from MinIO. S3 delete is idempotent if the key is already gone."""
@@ -314,10 +305,16 @@ class MediaStorage:
             raise
         logger.info(f"Deleted MinIO object: {file_path}")
 
-    def delete_media_row(self, media_id: int) -> bool:
+    async def get_media_by_id(self, media_id: int) -> MediaMetadata:
+        async with self._db.get_session() as session:
+            result = await session.execute(select(Media).where(Media.id == media_id))
+            media = result.scalar_one()
+            return MediaMetadata.model_validate(media)
+
+    async def delete_media_row(self, media_id: int) -> bool:
         """Delete a media metadata row. Returns True if a row was removed."""
-        with self._get_session() as session:
-            result = session.execute(delete(Media).where(Media.id == media_id))
+        async with self._db.get_session() as session:
+            result = await session.execute(delete(Media).where(Media.id == media_id))
             deleted = result.rowcount > 0
             if deleted:
                 logger.info(f"Media #{media_id} deleted from database")

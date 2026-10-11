@@ -72,7 +72,7 @@ class MemesSender:
         
         await self._ensure_entity_resolved()
 
-        unsent_media = self.storage.get_unsent_media(limit=count)
+        unsent_media = await self.storage.get_unsent_media(limit=count)
 
         if not unsent_media:
             logger.info("No unsent memes found in database")
@@ -151,7 +151,7 @@ class MemesSender:
                 f"{media_type.capitalize()} #{media.id} could not be retrieved from MinIO "
                 f"(key: {media.file_path}): {e}. Marking as sent to avoid retrying"
             )
-            self.storage.mark_media_as_sent(media.id)
+            await self.storage.mark_media_as_sent(media.id)
             return False
         
         # Prepare caption
@@ -210,7 +210,7 @@ class MemesSender:
 
             message: Message = await self.client.send_file(**kwargs)
 
-            self.storage.mark_media_as_sent(media.id)
+            await self.storage.mark_media_as_sent(media.id)
             
             logger.info(
                 f"✓ Successfully sent {media_type} #{media.id} "
@@ -232,7 +232,7 @@ class MemesSender:
                 f"Telegram media error for {media_type} #{media.id}: {e}. "
                 f"Marking as sent to avoid retries."
             )
-            self.storage.mark_media_as_sent(media.id)
+            await self.storage.mark_media_as_sent(media.id)
             return False
             
         except Exception as e:

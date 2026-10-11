@@ -40,6 +40,8 @@ class AbstractSenderApp(ABC):
         except Exception as e:
             logger.error(f"Error in main loop: {e}", exc_info=True)
             return 1
+        finally:
+            await self.storage.dispose()
 
     def run(self) -> None:
         setup_logging()

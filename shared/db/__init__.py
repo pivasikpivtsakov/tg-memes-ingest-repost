@@ -1,5 +1,5 @@
 from shared.db.base import Base
 from shared.db.models import Media
-from shared.db.session import AsyncDatabaseManager, DatabaseManager
+from shared.db.session import AsyncDatabaseManager
 
-__all__ = ['Base', 'Media', 'DatabaseManager', 'AsyncDatabaseManager']
+__all__ = ['Base', 'Media', 'AsyncDatabaseManager']

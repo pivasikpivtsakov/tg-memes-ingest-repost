@@ -154,7 +154,7 @@ def register_message_handler(client: TelegramClient) -> None:
             
             # Save media (unified call for both photos and videos)
             if should_save_photo or should_save_video:
-                file_path, is_duplicate = media_storage.save_media(
+                file_path, is_duplicate = await media_storage.save_media(
                     media_type=media_type,
                     media_data=media_bytes,
                     chat_id=chat_id,
