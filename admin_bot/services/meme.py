@@ -109,6 +109,7 @@ def format_meme_card(media: MediaMetadata, *, source_label: str | None) -> str:
         mime_type=escape(media.mime_type) if media.mime_type else _dash(),
         video_codec=escape(media.video_codec) if media.video_codec else _dash(),
         round_message=_fmt_bool(media.round_message),
+        video_sticker=_fmt_bool(media.video_sticker),
         sender_name=sender,
         sender_id=media.sender_id,
         caption=caption,

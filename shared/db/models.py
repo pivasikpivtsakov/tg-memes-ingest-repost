@@ -61,14 +61,14 @@ class Media(Base):
         nullable=False,
         comment="Telegram user/channel ID of the sender"
     )
-    sender_name: Mapped[Optional[str]] = mapped_column(
+    sender_name: Mapped[str] = mapped_column(
         Text, 
-        nullable=True,
+        nullable=False,
         comment="Display name of the sender"
     )
-    chat_title: Mapped[Optional[str]] = mapped_column(
+    chat_title: Mapped[str] = mapped_column(
         Text, 
-        nullable=True,
+        nullable=False,
         comment="Title of the chat/channel"
     )
     caption: Mapped[Optional[str]] = mapped_column(
@@ -76,9 +76,9 @@ class Media(Base):
         nullable=True,
         comment="Original caption/text from message"
     )
-    telegram_id: Mapped[Optional[int]] = mapped_column(
+    telegram_id: Mapped[int] = mapped_column(
         BigInteger, 
-        nullable=True,
+        nullable=False,
         comment="Telegram's internal ID for the media file"
     )
     grouped_id: Mapped[Optional[int]] = mapped_column(
@@ -93,9 +93,9 @@ class Media(Base):
     )
     
     # File properties
-    file_size: Mapped[Optional[int]] = mapped_column(
+    file_size: Mapped[int] = mapped_column(
         Integer, 
-        nullable=True,
+        nullable=False,
         comment="File size in bytes"
     )
     width: Mapped[Optional[int]] = mapped_column(
@@ -127,6 +127,13 @@ class Media(Base):
         Boolean,
         nullable=True,
         comment="Whether the source video is a round video note (circular message); videos only"
+    )
+    video_sticker: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default='false',
+        comment="Whether the source video is a Telegram video sticker (webm/vp9)"
     )
     
     # Status tracking
@@ -161,8 +168,8 @@ class Media(Base):
         server_default=func.current_timestamp(),
         comment="When media was downloaded and saved"
     )
-    created_at: Mapped[Optional[datetime]] = mapped_column(
-        nullable=True,
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False,
         comment="Original creation timestamp from Telegram"
     )
 

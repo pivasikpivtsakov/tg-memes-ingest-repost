@@ -4,7 +4,12 @@ from io import BytesIO
 
 from telethon import TelegramClient
 from telethon.errors import FloodWaitError, FileReferenceExpiredError, MediaEmptyError
-from telethon.tl.types import Message, DocumentAttributeVideo
+from telethon.tl.types import (
+    Message,
+    DocumentAttributeVideo,
+    DocumentAttributeSticker,
+    InputStickerSetEmpty,
+)
 
 from sender_tg_app.services.video_thumbnail import generate_video_thumbnail, needs_own_thumbnail
 from shared.storage import MediaStorage, MediaMetadata
@@ -153,6 +158,9 @@ class MemesSender:
                 is_round = bool(media.round_message)
                 if is_round:
                     kwargs['video_note'] = True
+                if media.video_sticker:
+                    kwargs['mime_type'] = media.mime_type or 'video/webm'
+                    kwargs['nosound_video'] = True
                 # if we know the width and height, we add it explicitly. 
                 # telethon or telegram should not try to guess and repair it.
                 # they often do it wrong.
@@ -165,8 +173,13 @@ class MemesSender:
                             supports_streaming=True,
                             video_codec=media.video_codec,
                             round_message=is_round,
+                            nosound=True if media.video_sticker else None,
                         )
                     ]
+                    if media.video_sticker:
+                        kwargs['attributes'].append(
+                            DocumentAttributeSticker(alt='', stickerset=InputStickerSetEmpty())
+                        )
                 thumb = await self._build_own_thumbnail_if_needed(media=media, media_data=media_data)
                 if thumb is not None:
                     kwargs['thumb'] = thumb

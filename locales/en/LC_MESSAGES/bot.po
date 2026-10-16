@@ -170,6 +170,7 @@ msgstr ""
 "MIME: {mime_type}\n"
 "Codec: {video_codec}\n"
 "Round: {round_message}\n"
+"Video sticker: {video_sticker}\n"
 "Sender: {sender_name} (<code>{sender_id}</code>)\n"
 "Caption: {caption}"
 

@@ -1,7 +1,7 @@
 import logging
 import os
 from telethon import events, TelegramClient
-from telethon.tl.types import DocumentAttributeVideo, DocumentAttributeFilename
+from telethon.tl.types import DocumentAttributeVideo, DocumentAttributeFilename, DocumentAttributeSticker
 
 from ingestion_app.config import config
 from ingestion_app.handlers.utils import get_sender_name
@@ -28,8 +28,9 @@ allowed_chats = AllowedChatsRepository(redis=redis_client)
 
 
 def extract_video_attributes(video):
-    """Extract width, height, duration, codec, round_message flag, and filename from video attributes."""
+    """Extract width, height, duration, codec, round/sticker flags, and filename from video attributes."""
     width = height = duration = video_codec = round_message = filename = None
+    video_sticker = False
     for attr in video.attributes:
         if isinstance(attr, DocumentAttributeVideo):
             width, height, duration = attr.w, attr.h, attr.duration
@@ -37,7 +38,11 @@ def extract_video_attributes(video):
             round_message = attr.round_message
         elif isinstance(attr, DocumentAttributeFilename):
             filename = attr.file_name
-    return width, height, duration, video_codec, round_message, filename
+        elif isinstance(attr, DocumentAttributeSticker):
+            video_sticker = True
+    if not video_sticker and (getattr(video, 'mime_type', None) or '').lower() == 'video/webm':
+        video_sticker = True
+    return width, height, duration, video_codec, round_message, video_sticker, filename
 
 
 def determine_video_extension(video, filename):
@@ -83,6 +88,7 @@ async def save_media_from_message(
         duration = None
         video_codec = None
         round_message = None
+        video_sticker = False
         mime_type = 'image/jpeg'
         file_extension = 'jpg'
         created_at = photo.date
@@ -103,7 +109,7 @@ async def save_media_from_message(
 
         media_bytes = await client.download_media(message, file=bytes)
 
-        width, height, duration, video_codec, round_message, filename = extract_video_attributes(video)
+        width, height, duration, video_codec, round_message, video_sticker, filename = extract_video_attributes(video)
         file_extension = determine_video_extension(video, filename)
 
         media_type = "video"
@@ -131,6 +137,7 @@ async def save_media_from_message(
         created_at=created_at,
         video_codec=video_codec,
         round_message=round_message,
+        video_sticker=video_sticker,
         grouped_id=grouped_id,
         album_position=album_position,
     )

@@ -170,6 +170,7 @@ msgstr ""
 "MIME: {mime_type}\n"
 "Кодек: {video_codec}\n"
 "Кружок: {round_message}\n"
+"Видеостикер: {video_sticker}\n"
 "Автор: {sender_name} (<code>{sender_id}</code>)\n"
 "Подпись: {caption}"
 
