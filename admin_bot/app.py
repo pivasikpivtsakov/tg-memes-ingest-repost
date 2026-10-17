@@ -26,11 +26,11 @@ def build_dispatcher(
         key_builder=DefaultKeyBuilder(prefix="admin_bot_fsm", with_destiny=True),
     )
     dispatcher = Dispatcher(storage=storage)
-    admins = AdminsService(redis=redis)
+    admins_service = AdminsService(redis=redis)
     allowed_chats = AllowedChatsService(redis=redis)
     dispatcher.workflow_data.update(
         {
-            "admins": admins,
+            "admins": admins_service,
             "allowed_chats": allowed_chats,
             "tg_client": tg_client,
             "media_lookup": media_lookup,
@@ -38,7 +38,7 @@ def build_dispatcher(
         }
     )
     dispatcher.update.middleware(FSMI18nMiddleware(i18n=i18n))
-    dispatcher.update.middleware(AccessMiddleware(admins=admins))
+    dispatcher.update.middleware(AccessMiddleware(admins=admins_service))
     dispatcher.message.outer_middleware(MenuMiddleware(i18n=i18n))
 
     dispatcher.include_router(start.router)
