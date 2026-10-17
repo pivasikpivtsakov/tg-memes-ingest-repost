@@ -4,8 +4,7 @@ import logging
 from telethon import TelegramClient
 
 from ingestion_app.config import config
-from ingestion_app.handlers import register_handlers
-from ingestion_app.handlers.message import media_storage
+from ingestion_app.handlers.message import media_service, register_message_handler
 from shared.logger import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ async def main() -> None:
             username = f"@{me.username}" if me.username else "No username"
             logger.info(f"Logged in as: {me.first_name} {username} (ID: {me.id})")
 
-            register_handlers(client)
+            register_message_handler(client)
 
             logger.info("Listening for incoming messages... Press Ctrl+C to stop.")
             await client.run_until_disconnected()
@@ -39,7 +38,7 @@ async def main() -> None:
         logger.error(f"Error in main loop: {e}", exc_info=True)
         raise
     finally:
-        await media_storage.dispose()
+        await media_service.dispose()
 
 
 def run() -> None:

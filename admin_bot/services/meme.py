@@ -4,7 +4,7 @@ from html import escape
 from aiogram.types import Chat, Message, MessageOriginChannel
 from aiogram.utils.i18n import gettext as _
 
-from shared.storage import MediaMetadata
+from shared.db.repositories.media import MediaMetadata
 
 
 def is_our_public_chat(chat_id: int, username: str | None, target: str) -> bool:

@@ -14,7 +14,7 @@ from admin_bot.keyboards.admins import (
     admins_kb,
 )
 from admin_bot.keyboards.start import OpenZoneCB, StartZone
-from shared.redis import AdminIdsRepository
+from shared.services import AdminsService
 
 router = Router(name="admins")
 
@@ -44,7 +44,7 @@ async def _render_panel(
     *,
     callback: CallbackQuery,
     state: FSMContext,
-    admins: AdminIdsRepository,
+    admins: AdminsService,
 ) -> None:
     await state.set_state(None)
     text, markup = _panel_view(await admins.all(), await admins.super_id())
@@ -55,7 +55,7 @@ async def _render_panel(
 async def open_admins(
     callback: CallbackQuery,
     state: FSMContext,
-    admins: AdminIdsRepository,
+    admins: AdminsService,
 ) -> None:
     await _render_panel(callback=callback, state=state, admins=admins)
 
@@ -75,7 +75,7 @@ async def prompt_add_admin(callback: CallbackQuery, state: FSMContext) -> None:
 async def cancel_admin(
     callback: CallbackQuery,
     state: FSMContext,
-    admins: AdminIdsRepository,
+    admins: AdminsService,
 ) -> None:
     await _render_panel(callback=callback, state=state, admins=admins)
 
@@ -85,7 +85,7 @@ async def remove_admin(
     callback: CallbackQuery,
     callback_data: AdminRemoveCB,
     state: FSMContext,
-    admins: AdminIdsRepository,
+    admins: AdminsService,
 ) -> None:
     if await admins.is_super(user_id=callback_data.user_id):
         await callback.answer(_("admins.cannot_remove_super"), show_alert=True)
@@ -102,7 +102,7 @@ async def remove_admin(
 async def add_admin(
     message: Message,
     state: FSMContext,
-    admins: AdminIdsRepository,
+    admins: AdminsService,
 ) -> None:
     user_id = _parse_id(message.text or "")
     if user_id is None:

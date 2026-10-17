@@ -9,14 +9,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from telethon import TelegramClient
 
 from sender_tg_app.config import config
+from shared.redis import create_redis
 from shared.services import (
+    AllowedChatsService,
     ChannelTarget,
     ChannelTargetKind,
-    leave_and_unallow,
     parse_channel_target,
     resolve_channel,
 )
-from shared.redis import AllowedChatsRepository, create_redis
 
 
 async def leave_channel(raw_target: str) -> int:
@@ -26,7 +26,7 @@ async def leave_channel(raw_target: str) -> int:
         return 1
 
     redis = create_redis(config.redis_url)
-    allowed_chats = AllowedChatsRepository(redis=redis)
+    allowed_chats = AllowedChatsService(redis=redis)
     client = TelegramClient(config.session_name, config.api_id, config.api_hash)
     print(f"Connecting using session: {config.session_name}")
     try:
@@ -40,7 +40,7 @@ async def leave_channel(raw_target: str) -> int:
                 print(f"Channel not found in allowlist and could not be resolved: {raw_target}")
                 return 1
             print(f"Leaving chat_id={chat_id}")
-            result = await leave_and_unallow(client, allowed_chats, chat_id)
+            result = await allowed_chats.leave_and_unallow(client, chat_id)
     except Exception as exc:
         print(f"Leave failed: {exc}")
         return 1
@@ -54,7 +54,7 @@ async def leave_channel(raw_target: str) -> int:
 async def _resolve_chat_id(
     *,
     client: TelegramClient,
-    allowed_chats: AllowedChatsRepository,
+    allowed_chats: AllowedChatsService,
     target: ChannelTarget,
 ) -> int | None:
     if target.kind is ChannelTargetKind.ID:

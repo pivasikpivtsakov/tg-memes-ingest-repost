@@ -28,7 +28,7 @@ class TelegramSenderApp(AbstractSenderApp):
             
             sender = MemesSender(
                 client=client,
-                storage=self.storage,
+                media_service=self.media_service,
                 target_chat_id=self.config.target_chat_id,
                 include_caption=self.config.include_caption
             )

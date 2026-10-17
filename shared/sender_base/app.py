@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 from shared.logger import setup_logging
 from shared.sender_base.config import BaseSenderConfig
-from shared.storage import MediaStorage
+from shared.services.media import MediaService
 
 logger = logging.getLogger(__name__)
 
@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 class AbstractSenderApp(ABC):
     def __init__(self, config: BaseSenderConfig):
         self.config = config
-        self.storage = self._create_storage()
-    
-    def _create_storage(self) -> MediaStorage:
-        storage = MediaStorage(
+        self.media_service = self._create_media_service()
+
+    def _create_media_service(self) -> MediaService:
+        media_service = MediaService(
             self.config.database_url,
             self.config.minio_endpoint,
             self.config.minio_access_key,
@@ -23,8 +23,8 @@ class AbstractSenderApp(ABC):
             self.config.minio_bucket,
             self.config.minio_secure
         )
-        logger.info("Media storage initialized with MinIO")
-        return storage
+        logger.info("Media service initialized with MinIO")
+        return media_service
 
     @abstractmethod
     async def _run_sender(self) -> int:
@@ -41,7 +41,7 @@ class AbstractSenderApp(ABC):
             logger.error(f"Error in main loop: {e}", exc_info=True)
             return 1
         finally:
-            await self.storage.dispose()
+            await self.media_service.dispose()
 
     def run(self) -> None:
         setup_logging()

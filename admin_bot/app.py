@@ -9,7 +9,7 @@ from admin_bot.handlers import admins, channels, fallback, language, meme_info, 
 from admin_bot.middlewares.access import AccessMiddleware
 from admin_bot.middlewares.menu import MenuMiddleware
 from admin_bot.services.media import MediaLookup
-from shared.redis import AdminIdsRepository, AllowedChatsRepository
+from shared.services import AdminsService, AllowedChatsService
 
 
 def build_dispatcher(
@@ -26,11 +26,11 @@ def build_dispatcher(
         key_builder=DefaultKeyBuilder(prefix="admin_bot_fsm", with_destiny=True),
     )
     dispatcher = Dispatcher(storage=storage)
-    admins_repo = AdminIdsRepository(redis=redis)
-    allowed_chats = AllowedChatsRepository(redis=redis)
+    admins = AdminsService(redis=redis)
+    allowed_chats = AllowedChatsService(redis=redis)
     dispatcher.workflow_data.update(
         {
-            "admins": admins_repo,
+            "admins": admins,
             "allowed_chats": allowed_chats,
             "tg_client": tg_client,
             "media_lookup": media_lookup,
@@ -38,7 +38,7 @@ def build_dispatcher(
         }
     )
     dispatcher.update.middleware(FSMI18nMiddleware(i18n=i18n))
-    dispatcher.update.middleware(AccessMiddleware(admins=admins_repo))
+    dispatcher.update.middleware(AccessMiddleware(admins=admins))
     dispatcher.message.outer_middleware(MenuMiddleware(i18n=i18n))
 
     dispatcher.include_router(start.router)

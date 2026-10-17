@@ -11,7 +11,7 @@ from telethon.tl.functions.messages import CheckChatInviteRequest, ImportChatInv
 from telethon.tl.types import ChatInviteAlready
 from telethon.utils import get_peer_id
 
-from shared.redis import AllowedChatsRepository
+from shared.redis.repositories import AllowedChatsRepository
 
 logger = logging.getLogger(__name__)
 

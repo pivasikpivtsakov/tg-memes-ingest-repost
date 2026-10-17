@@ -4,7 +4,7 @@ from aiogram.utils.i18n import gettext as _
 
 from admin_bot.services.media import MediaLookup
 from admin_bot.services.meme import format_meme_card, post_date_from_our_public
-from shared.redis import AllowedChatsRepository
+from shared.services import AllowedChatsService
 
 router = Router(name="meme_info")
 
@@ -13,7 +13,7 @@ router = Router(name="meme_info")
 async def show_forwarded_meme(
     message: Message,
     media_lookup: MediaLookup,
-    allowed_chats: AllowedChatsRepository,
+    allowed_chats: AllowedChatsService,
     config_target_chat_id: str,
 ) -> None:
     posted_at = post_date_from_our_public(message, config_target_chat_id)

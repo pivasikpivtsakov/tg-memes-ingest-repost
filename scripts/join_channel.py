@@ -9,8 +9,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from telethon import TelegramClient
 
 from sender_tg_app.config import config
-from shared.services import join_and_allow, parse_channel_target
-from shared.redis import AllowedChatsRepository, create_redis
+from shared.redis import create_redis
+from shared.services import AllowedChatsService, parse_channel_target
 
 
 async def join_channel(raw_target: str) -> int:
@@ -21,13 +21,13 @@ async def join_channel(raw_target: str) -> int:
         return 1
 
     redis = create_redis(config.redis_url)
-    allowed_chats = AllowedChatsRepository(redis=redis)
+    allowed_chats = AllowedChatsService(redis=redis)
     client = TelegramClient(config.session_name, config.api_id, config.api_hash)
     print(f"Connecting using session: {config.session_name}")
     print(f"Joining {target.kind.value}: {target.value}")
     try:
         async with client:
-            result = await join_and_allow(client, allowed_chats, target)
+            result = await allowed_chats.join_and_allow(client, target)
     except Exception as exc:
         print(f"Join failed: {exc}")
         return 1

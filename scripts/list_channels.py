@@ -7,12 +7,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from ingestion_app.config import config
-from shared.redis import AllowedChatsRepository, create_redis
+from shared.redis import create_redis
+from shared.services import AllowedChatsService
 
 
 async def main() -> None:
     redis = create_redis(config.redis_url)
-    allowed_chats = AllowedChatsRepository(redis=redis)
+    allowed_chats = AllowedChatsService(redis=redis)
     try:
         stored_chats = await allowed_chats.all()
     finally:

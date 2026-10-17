@@ -14,14 +14,14 @@ from shared.logger import setup_logging
 
 
 async def main(media_id: int, target_chat_id: str) -> None:
-    storage = TelegramSenderApp(config).storage
+    media_service = TelegramSenderApp(config).media_service
     try:
-        media = await storage.get_media_by_id(media_id)
+        media = await media_service.get_media_by_id(media_id)
         client = TelegramClient(config.session_name, config.api_id, config.api_hash)
         async with client:
             sender = MemesSender(
                 client=client,
-                storage=storage,
+                media_service=media_service,
                 target_chat_id=target_chat_id,
                 include_caption=config.include_caption,
             )
@@ -29,7 +29,7 @@ async def main(media_id: int, target_chat_id: str) -> None:
             success = await sender._send_media(media)
         print(f"media #{media_id} sent: {success}")
     finally:
-        await storage.dispose()
+        await media_service.dispose()
 
 
 if __name__ == '__main__':

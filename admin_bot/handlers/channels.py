@@ -39,15 +39,12 @@ from admin_bot.keyboards.channels import (
 from admin_bot.keyboards.start import OpenZoneCB, StartZone
 from admin_bot.services.meme import is_from_our_public, is_our_public_chat, source_channel_from_message
 from admin_bot.utils.telegram import ignore_message_gone, ignore_not_modified
-from shared.redis import AllowedChatsRepository
 from shared.services import (
+    AllowedChatsService,
     ChannelResult,
     ChannelTarget,
     ChannelTargetKind,
-    join_and_allow,
-    leave_and_unallow,
     parse_channel_target,
-    refresh_allowed_chat_labels,
     resolve_channel,
 )
 
@@ -138,7 +135,7 @@ async def _show_list(
     *,
     callback: CallbackQuery,
     state: FSMContext,
-    allowed_chats: AllowedChatsRepository,
+    allowed_chats: AllowedChatsService,
     answer: bool = True,
 ) -> None:
     await state.set_state(None)
@@ -180,7 +177,7 @@ async def _show_list(
 async def confirm_delete_from_command(
     message: Message,
     state: FSMContext,
-    allowed_chats: AllowedChatsRepository,
+    allowed_chats: AllowedChatsService,
     delete_chat_id: int,
 ) -> None:
     with ignore_message_gone():
@@ -205,7 +202,7 @@ async def confirm_delete_from_command(
 async def open_channels(
     callback: CallbackQuery,
     state: FSMContext,
-    allowed_chats: AllowedChatsRepository,
+    allowed_chats: AllowedChatsService,
 ) -> None:
     await _show_list(callback=callback, state=state, allowed_chats=allowed_chats)
 
@@ -225,7 +222,7 @@ async def start_add_channel(callback: CallbackQuery, state: FSMContext) -> None:
 async def refresh_channel_labels(
     callback: CallbackQuery,
     state: FSMContext,
-    allowed_chats: AllowedChatsRepository,
+    allowed_chats: AllowedChatsService,
     tg_client: TelegramClient,
 ) -> None:
     await callback.answer()
@@ -239,7 +236,7 @@ async def refresh_channel_labels(
             await callback.message.edit_text(_("channels.refreshing"), reply_markup=None)
         await remember_panel_messages(state=state, menu_id=callback.message.message_id)
     try:
-        await refresh_allowed_chat_labels(tg_client, allowed_chats)
+        await allowed_chats.refresh_allowed_chat_labels(tg_client)
     except Exception as exc:
         logger.warning("Failed to refresh channel labels: %s", exc)
     await _show_list(
@@ -254,7 +251,7 @@ async def refresh_channel_labels(
 async def cancel_channel_flow(
     callback: CallbackQuery,
     state: FSMContext,
-    allowed_chats: AllowedChatsRepository,
+    allowed_chats: AllowedChatsService,
 ) -> None:
     await _show_list(callback=callback, state=state, allowed_chats=allowed_chats)
 
@@ -264,14 +261,14 @@ async def delete_channel(
     callback: CallbackQuery,
     callback_data: ChannelDeleteConfirmCB,
     state: FSMContext,
-    allowed_chats: AllowedChatsRepository,
+    allowed_chats: AllowedChatsService,
     tg_client: TelegramClient,
 ) -> None:
     await callback.answer()
     if isinstance(callback.message, Message):
         await callback.message.edit_text(_("channels.removing"), reply_markup=None)
     try:
-        await leave_and_unallow(tg_client, allowed_chats, callback_data.chat_id)
+        await allowed_chats.leave_and_unallow(tg_client, callback_data.chat_id)
     except Exception as exc:
         logger.warning("Failed to leave channel %s: %s", callback_data.chat_id, exc)
         if isinstance(callback.message, Message):
@@ -291,7 +288,7 @@ async def delete_channel(
 async def confirm_join(
     callback: CallbackQuery,
     state: FSMContext,
-    allowed_chats: AllowedChatsRepository,
+    allowed_chats: AllowedChatsService,
     tg_client: TelegramClient,
 ) -> None:
     data = await state.get_data()
@@ -304,9 +301,8 @@ async def confirm_join(
     if isinstance(callback.message, Message):
         await callback.message.edit_text(_("channels.joining"), reply_markup=None)
     try:
-        await join_and_allow(
+        await allowed_chats.join_and_allow(
             tg_client,
-            allowed_chats,
             ChannelTarget(kind=ChannelTargetKind(kind), value=value),
         )
     except Exception as exc:

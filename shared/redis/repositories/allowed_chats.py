@@ -1,12 +1,9 @@
-from redis.asyncio import Redis
+from shared.redis.repositories.base import RedisRepository
 
 _KEY = "ingestion:allowed_chats"
 
 
-class AllowedChatsRepository:
-    def __init__(self, *, redis: Redis) -> None:
-        self._redis = redis
-
+class AllowedChatsRepository(RedisRepository):
     async def is_allowed(self, *, chat_id: int) -> bool:
         return await self._redis.hexists(_KEY, str(chat_id))
 
@@ -17,5 +14,4 @@ class AllowedChatsRepository:
         await self._redis.hdel(_KEY, str(chat_id))
 
     async def all(self) -> dict[int, str]:
-        entries = await self._redis.hgetall(_KEY)
-        return {int(chat_id): label for chat_id, label in entries.items()}
+        return self._int_keyed(await self._redis.hgetall(_KEY))

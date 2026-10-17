@@ -5,11 +5,11 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Update, User
 from aiogram.utils.i18n import gettext as _
 
-from shared.redis import AdminIdsRepository
+from shared.services import AdminsService
 
 
 class AccessMiddleware(BaseMiddleware):
-    def __init__(self, *, admins: AdminIdsRepository) -> None:
+    def __init__(self, *, admins: AdminsService) -> None:
         self._admins = admins
 
     async def __call__(

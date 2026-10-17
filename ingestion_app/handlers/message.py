@@ -4,17 +4,15 @@ from telethon import events, TelegramClient
 from telethon.tl.types import DocumentAttributeVideo, DocumentAttributeFilename, DocumentAttributeSticker
 
 from ingestion_app.config import config
-from ingestion_app.handlers.utils import get_sender_name
-from shared.storage import MediaStorage
-from shared.redis import create_redis, AllowedChatsRepository
+from shared.redis import create_redis
+from shared.services import AllowedChatsService, MediaService
 
 logger = logging.getLogger(__name__)
 
 # Video size limit: 50 MB
 MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024
 
-# Initialize media storage with MinIO and PostgreSQL metadata tracking
-media_storage = MediaStorage(
+media_service = MediaService(
     config.database_url,
     config.minio_endpoint,
     config.minio_access_key,
@@ -24,7 +22,15 @@ media_storage = MediaStorage(
 )
 
 redis_client = create_redis(config.redis_url)
-allowed_chats = AllowedChatsRepository(redis=redis_client)
+allowed_chats = AllowedChatsService(redis=redis_client)
+
+
+def get_sender_name(sender) -> str:
+    if getattr(sender, 'first_name', None) and getattr(sender, 'last_name', None):
+        return f"{sender.first_name} {sender.last_name}"
+    if getattr(sender, 'title', None):
+        return sender.title
+    return 'Unknown'
 
 
 def extract_video_attributes(video):
@@ -119,7 +125,7 @@ async def save_media_from_message(
     else:
         return
 
-    file_path, is_duplicate = await media_storage.save_media(
+    file_path, is_duplicate = await media_service.save_media(
         media_type=media_type,
         media_data=media_bytes,
         chat_id=chat_id,

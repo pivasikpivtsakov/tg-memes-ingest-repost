@@ -10,12 +10,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared.config import BaseConfig
 from shared.logger import setup_logging
-from shared.storage import MediaMetadata, MediaStorage
+from shared.services.media import MediaMetadata, MediaService
 
 
-def build_storage() -> MediaStorage:
+def build_media_service() -> MediaService:
     config = BaseConfig()
-    return MediaStorage(
+    return MediaService(
         config.database_url,
         config.minio_endpoint,
         config.minio_access_key,
@@ -64,18 +64,18 @@ def confirm_delete(count: int) -> bool:
     return answer in {"y", "yes"}
 
 
-async def delete_items(storage: MediaStorage, items: list[MediaMetadata]) -> int:
+async def delete_items(media_service: MediaService, items: list[MediaMetadata]) -> int:
     deleted = 0
     failed = 0
     for media in items:
         print(f"Deleting #{media.id} ({media.file_path}) ...", end=" ", flush=True)
         try:
-            storage.delete_minio_object(media.file_path)
+            media_service.delete_object(media.file_path)
         except Exception as exc:
             failed += 1
             print(f"minio FAILED: {exc} (db row kept)")
             continue
-        if await storage.delete_media_row(media.id):
+        if await media_service.delete_media_row(media.id):
             deleted += 1
             print("minio ok, db ok")
         else:
@@ -99,10 +99,10 @@ async def main() -> int:
     args = parser.parse_args()
 
     setup_logging(logging.WARNING)
-    storage = build_storage()
+    media_service = build_media_service()
     try:
         try:
-            items = await storage.find_media_by_where(args.where)
+            items = await media_service.find_media_by_where(args.where)
         except Exception as exc:
             print(f"Query failed: {exc}")
             return 1
@@ -115,9 +115,9 @@ async def main() -> int:
         if not confirm_delete(len(items)):
             print("Aborted.")
             return 0
-        return await delete_items(storage, items)
+        return await delete_items(media_service, items)
     finally:
-        await storage.dispose()
+        await media_service.dispose()
 
 
 if __name__ == "__main__":

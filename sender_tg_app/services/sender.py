@@ -12,23 +12,21 @@ from telethon.tl.types import (
 )
 
 from sender_tg_app.services.video_thumbnail import generate_video_thumbnail, needs_own_thumbnail
-from shared.storage import MediaStorage, MediaMetadata
+from shared.services.media import MediaMetadata, MediaService
 
 logger = logging.getLogger(__name__)
 
 
 class MemesSender:
-    """Service for sending memes from storage to Telegram channels."""
-    
     def __init__(
         self, 
         client: TelegramClient, 
-        storage: MediaStorage,
+        media_service: MediaService,
         target_chat_id: str,
         include_caption: bool = True
     ):
         self.client = client
-        self.storage = storage
+        self.media_service = media_service
         self.target_chat_id = target_chat_id
         self.include_caption = include_caption
         self._resolved_entity = None
@@ -57,7 +55,7 @@ class MemesSender:
         
         await self._ensure_entity_resolved()
 
-        media = await self.storage.get_unsent_media()
+        media = await self.media_service.get_unsent_media()
 
         if media is None:
             logger.info("No unsent memes found in database")
@@ -71,7 +69,7 @@ class MemesSender:
         if media.grouped_id is None:
             return await self._send_single_meme(media)
 
-        siblings = await self.storage.get_unsent_album_siblings(
+        siblings = await self.media_service.get_unsent_album_siblings(
             chat_id=media.chat_id,
             grouped_id=media.grouped_id,
         )
@@ -113,13 +111,13 @@ class MemesSender:
         
         # Retrieve media data from MinIO
         try:
-            media_data = self.storage.get_media_data(media.file_path)
+            media_data = self.media_service.get_media_data(media.file_path)
         except Exception as e:
             logger.warning(
                 f"{media_type.capitalize()} #{media.id} could not be retrieved from MinIO "
                 f"(key: {media.file_path}): {e}. Marking as sent to avoid retrying"
             )
-            await self.storage.mark_media_as_sent(media.id)
+            await self.media_service.mark_media_as_sent(media.id)
             return False
         
         # Prepare caption
@@ -186,7 +184,7 @@ class MemesSender:
 
             message: Message = await self.client.send_file(**kwargs)
 
-            await self.storage.mark_media_as_sent(media.id)
+            await self.media_service.mark_media_as_sent(media.id)
             
             logger.info(
                 f"✓ Successfully sent {media_type} #{media.id} "
@@ -208,7 +206,7 @@ class MemesSender:
                 f"Telegram media error for {media_type} #{media.id}: {e}. "
                 f"Marking as sent to avoid retries."
             )
-            await self.storage.mark_media_as_sent(media.id)
+            await self.media_service.mark_media_as_sent(media.id)
             return False
             
         except Exception as e:
@@ -226,13 +224,13 @@ class MemesSender:
 
         for media in medias:
             try:
-                media_data = self.storage.get_media_data(media.file_path)
+                media_data = self.media_service.get_media_data(media.file_path)
             except Exception as e:
                 logger.warning(
                     f"{media.media_type.capitalize()} #{media.id} could not be retrieved from MinIO "
                     f"(key: {media.file_path}): {e}. Marking as sent to avoid retrying"
                 )
-                await self.storage.mark_media_as_sent(media.id)
+                await self.media_service.mark_media_as_sent(media.id)
                 continue
 
             file_buffer = BytesIO(media_data)
@@ -259,7 +257,7 @@ class MemesSender:
                 force_document=False,
                 supports_streaming=True,
             )
-            await self.storage.mark_medias_as_sent(attempt_ids)
+            await self.media_service.mark_medias_as_sent(attempt_ids)
             logger.info(
                 f"✓ Successfully sent album ({ids_preview}) to {self.target_chat_id}"
             )
@@ -277,7 +275,7 @@ class MemesSender:
                 f"Telegram media error for album ({ids_preview}): {e}. "
                 f"Marking as sent to avoid retries."
             )
-            await self.storage.mark_medias_as_sent(attempt_ids)
+            await self.media_service.mark_medias_as_sent(attempt_ids)
             return False
 
         except Exception as e:
