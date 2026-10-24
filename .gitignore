@@ -11,3 +11,4 @@ __pycache__/
 /admin.session
 /scripts/download_from_minio.py
 locales/**/*.mo
+/models/

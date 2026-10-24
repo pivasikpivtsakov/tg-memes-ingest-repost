@@ -4,13 +4,18 @@ SQLAlchemy ORM models for media storage.
 from datetime import datetime
 from typing import Optional, Literal
 
-from sqlalchemy import String, Integer, BigInteger, Boolean, Text, CheckConstraint, Index
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import (
+    String, Integer, BigInteger, Boolean, Text, CheckConstraint, Index, DateTime, ForeignKey,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 
 from shared.db.base import Base
 
 MediaType = Literal["photo", "video"]
+
+CLIP_EMBEDDING_DIM = 512
 
 
 class Media(Base):
@@ -202,4 +207,84 @@ class Media(Base):
             f"<Media(id={self.id}, type={self.media_type}, "
             f"hash={self.file_hash[:8]}..., is_sent_tg={self.is_sent_tg})>"
         )
+
+
+class MediaClipEmbedding(Base):
+    """CLIP image embedding of a media; videos store the mean over sampled frames."""
+    __tablename__ = 'media_clip_embeddings'
+
+    media_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey('medias.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    embedding: Mapped[list[float]] = mapped_column(
+        Vector(CLIP_EMBEDDING_DIM),
+        nullable=False,
+        comment="L2-normalized CLIP image embedding",
+    )
+    model: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        comment="CLIP model and pretrained tag that produced the embedding",
+    )
+    frame_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Number of frames averaged into the embedding (1 for photos)",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        Index(
+            'idx_media_clip_embeddings_hnsw',
+            'embedding',
+            postgresql_using='hnsw',
+            postgresql_ops={'embedding': 'vector_cosine_ops'},
+        ),
+    )
+
+
+class MediaOcr(Base):
+    """Text recognized on a media. Empty text means processed with nothing found."""
+    __tablename__ = 'media_ocr'
+
+    media_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey('medias.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    text: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        comment="Recognized lines joined with newlines",
+    )
+    text_norm: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        comment="Text normalized by shared.search.text.normalize_text",
+    )
+    engine: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        comment="OCR engine and models that produced the text",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        Index(
+            'idx_media_ocr_trgm',
+            'text_norm',
+            postgresql_using='gin',
+            postgresql_ops={'text_norm': 'gin_trgm_ops'},
+        ),
+    )
 

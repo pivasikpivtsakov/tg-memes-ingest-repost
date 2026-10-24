@@ -8,6 +8,7 @@ from shared.services.channels import (
     resolve_channel,
 )
 from shared.services.media import MediaService
+from shared.services.media_index import MediaIndexService
 
 __all__ = [
     "AdminsService",
@@ -16,6 +17,7 @@ __all__ = [
     "ChannelTarget",
     "ChannelTargetKind",
     "MediaService",
+    "MediaIndexService",
     "parse_channel_target",
     "resolve_channel",
 ]

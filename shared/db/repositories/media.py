@@ -194,6 +194,13 @@ class MediaRepository(PostgresRepository):
             result = await session.execute(select(Media).where(Media.id == media_id))
             return self._to_metadata(result.scalar_one())
 
+    async def list_by_ids(self, media_ids: list[int]) -> dict[int, MediaMetadata]:
+        if not media_ids:
+            return {}
+        async with self._session() as session:
+            results = await session.execute(select(Media).where(Media.id.in_(media_ids)))
+            return {media.id: self._to_metadata(media) for media in results.scalars().all()}
+
     async def delete_by_id(self, media_id: int) -> bool:
         async with self._session() as session:
             result = await session.execute(delete(Media).where(Media.id == media_id))

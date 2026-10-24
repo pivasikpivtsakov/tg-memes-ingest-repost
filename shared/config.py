@@ -44,6 +44,9 @@ class BaseConfig:
         self._minio_bucket = self._config_data.get('minio_bucket', 'tg-memes')
         self._minio_secure = self._config_data.get('minio_secure', False)
 
+        # Local ML model weights (CLIP towers)
+        self._models_dir = self._config_data.get('models_dir', 'models')
+
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from JSON file."""
         config_path = self._project_root / 'config.json'
@@ -149,6 +152,13 @@ class BaseConfig:
     def minio_secure(self) -> bool:
         return bool(self._minio_secure)
     
+    # ===== ML Models =====
+
+    @property
+    def models_dir(self) -> Path:
+        """Directory for local model weights; relative paths resolve from project root."""
+        return self._project_root / self._models_dir
+
     @property
     def project_root(self) -> Path:
         """Get project root directory."""
