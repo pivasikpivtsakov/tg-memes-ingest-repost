@@ -1,3 +1,4 @@
+from shared.device import validate_device
 from shared.indexer_base import BaseIndexerConfig
 
 
@@ -15,11 +16,8 @@ class OcrIndexerConfig(BaseIndexerConfig):
 
     @property
     def ocr_device(self) -> str:
-        """'cpu', or 'cuda' when onnxruntime-gpu is installed. The 1060 stays on cpu."""
-        device = str(self._ocr_device)
-        if device not in ('cpu', 'cuda'):
-            raise ValueError(f"ocr_device must be 'cpu' or 'cuda', got {device!r}")
-        return device
+        """'cpu' (default; the 1060 stays free), 'cuda', or 'auto' when ONNX Runtime has CUDA."""
+        return validate_device(str(self._ocr_device), name='ocr_device')
 
     @property
     def ocr_threads(self) -> int:

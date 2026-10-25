@@ -1,3 +1,4 @@
+from shared.device import validate_device
 from shared.indexer_base import BaseIndexerConfig
 
 
@@ -16,8 +17,8 @@ class ClipIndexerConfig(BaseIndexerConfig):
 
     @property
     def clip_device(self) -> str:
-        """'auto' (CUDA when available), 'cuda' or 'cpu'."""
-        return str(self._clip_device)
+        """'auto' (CUDA when PyTorch can see a GPU), 'cuda' or 'cpu'."""
+        return validate_device(str(self._clip_device), name='clip_device')
 
     @property
     def clip_video_frames(self) -> int:

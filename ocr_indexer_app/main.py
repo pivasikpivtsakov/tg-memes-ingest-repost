@@ -1,4 +1,3 @@
-import argparse
 import logging
 
 from ocr_indexer_app.config import OcrIndexerConfig, config
@@ -26,16 +25,8 @@ class OcrIndexerApp(AbstractIndexerApp[OcrRow]):
             device=config.ocr_device,
         )
 
-    def _extend_parser(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--device",
-            choices=("cpu", "cuda"),
-            help="override ocr_device; cuda needs onnxruntime-gpu instead of onnxruntime",
-        )
-
-    def _apply_args(self, args: argparse.Namespace) -> None:
-        if args.device is not None:
-            self.reader.device = args.device
+    def _apply_device(self, device: str) -> None:
+        self.reader.device = device
 
     def _load_model(self) -> None:
         self.reader.load()

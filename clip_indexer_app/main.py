@@ -30,6 +30,9 @@ class ClipIndexerApp(AbstractIndexerApp[ClipEmbeddingRow]):
         )
         self._decode_pool = ThreadPoolExecutor(max_workers=config.clip_decode_threads)
 
+    def _apply_device(self, device: str) -> None:
+        self.encoder.device = device
+
     def _load_model(self) -> None:
         self.encoder.load()
 
