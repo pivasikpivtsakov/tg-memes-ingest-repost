@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Install, remove and show cron jobs for the project apps.
 
-    python scripts/setup_cron.py install [task] [--every 30m]
+    python scripts/setup_cron.py --every 5 install sender
     python scripts/setup_cron.py remove [task]
     python scripts/setup_cron.py status [task]
 
 `sender` runs once per tick and exits. The indexers stay running and poll the
 database themselves; cron only starts one if it is not already running.
 Omitting the task installs or removes `sender`, and `status` then lists every task.
-`--every` accepts `10m`, `1h`, `1d`, `@hourly`, or a five-field cron expression.
+`--every` is minutes: `5` and `5m` both become `*/5 * * * *`.
+`1h`, `1d`, `@hourly`, and a five-field cron expression are accepted too.
 """
 
 import argparse
@@ -24,7 +25,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 LOGS_DIR = PROJECT_ROOT / "logs"
 
 _CRON_EXPR = re.compile(r"^(\S+\s+){4}\S+$")
-_EVERY = re.compile(r"^(\d+)([mhd])$")
+_EVERY = re.compile(r"^(\d+)([mhd]?)$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -70,29 +71,29 @@ TASKS = {
 
 
 def to_cron(every: str) -> str:
-    """Turn `10m`, `1h`, `1d`, `@hourly` or a cron expression into five cron fields."""
+    """Turn minutes, `1h`, `1d`, `@hourly`, or a cron expression into five fields."""
     text = every.strip()
     if text.startswith("@") or _CRON_EXPR.fullmatch(text):
         return text
 
     match = _EVERY.fullmatch(text)
     if not match:
-        raise ValueError(f"interval {every!r} is not 10m, 1h, 1d, or a cron expression")
+        raise ValueError(f"interval {every!r} must be minutes, for example 5")
 
     count = int(match.group(1))
-    unit = match.group(2)
+    unit = (match.group(2) or "m").lower()
     if count < 1:
         raise ValueError("interval must be at least 1")
     if unit == "m":
         if count > 59:
-            raise ValueError("minutes must be 1..59; use 1h or a cron expression")
+            raise ValueError("minutes must be 1..59")
         return "* * * * *" if count == 1 else f"*/{count} * * * *"
     if unit == "h":
         if count > 23:
-            raise ValueError("hours must be 1..23; use 1d or a cron expression")
+            raise ValueError("hours must be 1..23")
         return "0 * * * *" if count == 1 else f"0 */{count} * * *"
     if count != 1:
-        raise ValueError("only 1d is supported; pass a cron expression for other day steps")
+        raise ValueError("days must be 1")
     return "0 0 * * *"
 
 
@@ -179,7 +180,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--every",
-        help="how often cron fires: 10m, 1h, 1d, @hourly, or a five-field cron expression",
+        help="minutes, such as 5 or 30m; also 1h, 1d, @hourly, or a five-field cron expression",
     )
     args = parser.parse_args()
     if args.every and args.action != "install":
