@@ -165,8 +165,13 @@ class AbstractIndexerApp[RowT](ABC):
         finally:
             await self.index_service.dispose()
 
-    @staticmethod
-    def _parse_args() -> IndexerArgs:
+    def _extend_parser(self, parser: argparse.ArgumentParser) -> None:
+        pass
+
+    def _apply_args(self, args: argparse.Namespace) -> None:
+        pass
+
+    def _parse_args(self) -> IndexerArgs:
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--once",
@@ -179,7 +184,9 @@ class AbstractIndexerApp[RowT](ABC):
             default="desc",
             help="desc: newest medias first (daemon); asc: oldest first (archive backfill)",
         )
+        self._extend_parser(parser)
         args = parser.parse_args()
+        self._apply_args(args)
         return IndexerArgs(once=args.once, order=args.order)
 
     def run(self) -> None:

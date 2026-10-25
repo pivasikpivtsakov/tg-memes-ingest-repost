@@ -1,3 +1,4 @@
+import argparse
 import logging
 
 from ocr_indexer_app.config import OcrIndexerConfig, config
@@ -19,7 +20,22 @@ class OcrIndexerApp(AbstractIndexerApp[OcrRow]):
     def __init__(self, config: OcrIndexerConfig):
         super().__init__(config)
         self.config = config
-        self.reader = MemeTextReader(models_dir=config.models_dir, threads=config.ocr_threads)
+        self.reader = MemeTextReader(
+            models_dir=config.models_dir,
+            threads=config.ocr_threads,
+            device=config.ocr_device,
+        )
+
+    def _extend_parser(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument(
+            "--device",
+            choices=("cpu", "cuda"),
+            help="override ocr_device; cuda needs onnxruntime-gpu instead of onnxruntime",
+        )
+
+    def _apply_args(self, args: argparse.Namespace) -> None:
+        if args.device is not None:
+            self.reader.device = args.device
 
     def _load_model(self) -> None:
         self.reader.load()
@@ -52,7 +68,8 @@ class OcrIndexerApp(AbstractIndexerApp[OcrRow]):
     def _log_startup_info(self) -> None:
         logger.info("OCR Indexer App Starting")
         logger.info(f"Engine: {OCR_ENGINE_TAG}")
-        logger.info(f"Batch: {self.config.batch_size} medias, {self.config.ocr_threads} CPU threads")
+        logger.info(f"Device: {self.reader.device}")
+        logger.info(f"Batch: {self.config.batch_size} medias, {self.config.ocr_threads} threads")
         logger.info(f"Frames per video: {self.config.ocr_video_frames}")
 
 

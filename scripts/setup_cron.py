@@ -1,103 +1,204 @@
 #!/usr/bin/env python3
-"""
-Cron job setup for sender_tg_app.
+"""Install, remove and show cron jobs for the project apps.
 
-Usage:
-    python setup_cron.py install
-    python setup_cron.py remove
-    python setup_cron.py status
+    python scripts/setup_cron.py install [task] [--every 30m]
+    python scripts/setup_cron.py remove [task]
+    python scripts/setup_cron.py status [task]
+
+`sender` runs once per tick and exits. The indexers stay running and poll the
+database themselves; cron only starts one if it is not already running.
+Omitting the task installs or removes `sender`, and `status` then lists every task.
+`--every` accepts `10m`, `1h`, `1d`, `@hourly`, or a five-field cron expression.
 """
 
+import argparse
+import re
+import shlex
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+
 from crontab import CronTab
 
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+LOGS_DIR = PROJECT_ROOT / "logs"
 
-CRON_SCHEDULE = "*/30 * * * *"
-CRON_COMMENT = "tg-memes-sender"
+_CRON_EXPR = re.compile(r"^(\S+\s+){4}\S+$")
+_EVERY = re.compile(r"^(\d+)([mhd])$")
 
 
-def install_cron_job():
-    """Install or update the cron job."""
-    project_root = Path(__file__).parent.parent.resolve()
-    logs_dir = project_root / "logs"
-    logs_dir.mkdir(exist_ok=True)
-    
+@dataclass(frozen=True)
+class Task:
+    name: str
+    comment: str
+    module: str
+    args: tuple[str, ...]
+    log_name: str
+    default_every: str
+    stays_running: bool
+
+
+TASKS = {
+    "sender": Task(
+        name="sender",
+        comment="tg-memes-sender",
+        module="sender_tg_app",
+        args=(),
+        log_name="sender_cron.log",
+        default_every="30m",
+        stays_running=False,
+    ),
+    "clip-indexer": Task(
+        name="clip-indexer",
+        comment="tg-memes-clip-indexer",
+        module="clip_indexer_app",
+        args=(),
+        log_name="clip_indexer_cron.log",
+        default_every="1m",
+        stays_running=True,
+    ),
+    "ocr-indexer": Task(
+        name="ocr-indexer",
+        comment="tg-memes-ocr-indexer",
+        module="ocr_indexer_app",
+        args=(),
+        log_name="ocr_indexer_cron.log",
+        default_every="1m",
+        stays_running=True,
+    ),
+}
+
+
+def to_cron(every: str) -> str:
+    """Turn `10m`, `1h`, `1d`, `@hourly` or a cron expression into five cron fields."""
+    text = every.strip()
+    if text.startswith("@") or _CRON_EXPR.fullmatch(text):
+        return text
+
+    match = _EVERY.fullmatch(text)
+    if not match:
+        raise ValueError(f"interval {every!r} is not 10m, 1h, 1d, or a cron expression")
+
+    count = int(match.group(1))
+    unit = match.group(2)
+    if count < 1:
+        raise ValueError("interval must be at least 1")
+    if unit == "m":
+        if count > 59:
+            raise ValueError("minutes must be 1..59; use 1h or a cron expression")
+        return "* * * * *" if count == 1 else f"*/{count} * * * *"
+    if unit == "h":
+        if count > 23:
+            raise ValueError("hours must be 1..23; use 1d or a cron expression")
+        return "0 * * * *" if count == 1 else f"0 */{count} * * *"
+    if count != 1:
+        raise ValueError("only 1d is supported; pass a cron expression for other day steps")
+    return "0 0 * * *"
+
+
+def command_for(task: Task) -> str:
+    """One guarded command. `flock -E 0` exits quietly when this task is already running."""
+    log_path = LOGS_DIR / task.log_name
+    lock_path = LOGS_DIR / f"{task.name}.lock"
+    parts = [
+        "cd", shlex.quote(str(PROJECT_ROOT)),
+        "&&",
+        "flock", "-n", "-E", "0", shlex.quote(str(lock_path)),
+        shlex.quote(sys.executable), "-m", task.module,
+        *(shlex.quote(arg) for arg in task.args),
+        ">>", shlex.quote(str(log_path)), "2>&1",
+    ]
+    return " ".join(parts)
+
+
+def install(task: Task, every: str) -> int:
+    try:
+        schedule = to_cron(every)
+    except ValueError as exc:
+        print(exc)
+        return 1
+
+    LOGS_DIR.mkdir(exist_ok=True)
     cron = CronTab(user=True)
-    cron.remove_all(comment=CRON_COMMENT)
-    
-    # Create command
-    python_path = sys.executable
-    log_file = logs_dir / "sender_cron.log"
-    command = f"cd {project_root} && {python_path} -m sender_tg_app >> {log_file} 2>&1"
-    
-    # Create job
-    job = cron.new(command=command, comment=CRON_COMMENT)
-    job.setall(CRON_SCHEDULE)
-    
+    cron.remove_all(comment=task.comment)
+    job = cron.new(command=command_for(task), comment=task.comment)
+    try:
+        job.setall(schedule)
+    except (ValueError, KeyError) as exc:
+        print(f"Invalid schedule {schedule!r}: {exc}")
+        return 1
     if not job.is_valid():
-        print(f"❌ Invalid cron schedule: '{CRON_SCHEDULE}'")
-        return False
-    
+        print(f"Invalid schedule {schedule!r}")
+        return 1
+
     cron.write()
-    
-    print("✅ Cron job installed")
-    print(f"   Schedule: {CRON_SCHEDULE}")
-    print(f"   Logs: {log_file}")
-    print(f"   Next run: {job.schedule().get_next()}")
-    return True
+    print(f"Installed {task.name}")
+    print(f"  schedule: {schedule}")
+    print(f"  log: {LOGS_DIR / task.log_name}")
+    print(f"  next run: {job.schedule().get_next()}")
+    if task.stays_running:
+        print("  the process stays up; this schedule only restarts it if it has stopped")
+    return 0
 
 
-def remove_cron_job():
-    """Remove the cron job."""
+def remove(task: Task) -> int:
     cron = CronTab(user=True)
-    removed = cron.remove_all(comment=CRON_COMMENT)
-    cron.write()
-    
-    if removed > 0:
-        print(f"✅ Removed {removed} cron job(s)")
+    removed = cron.remove_all(comment=task.comment)
+    if removed:
+        cron.write()
+        print(f"Removed {removed} {task.name} job(s)")
     else:
-        print("ℹ️  No cron job found")
-    return True
+        print(f"No {task.name} job installed")
+    return 0
 
 
-def check_status():
-    """Check if the cron job is installed."""
+def status(tasks: list[Task]) -> int:
     cron = CronTab(user=True)
-    jobs = list(cron.find_comment(CRON_COMMENT))
-    
-    if jobs:
-        print("✅ Cron job installed")
+    for task in tasks:
+        jobs = list(cron.find_comment(task.comment))
+        if not jobs:
+            print(f"{task.name}: not installed")
+            continue
         for job in jobs:
-            print(f"   Schedule: {job.slices}")
-            print(f"   Enabled: {job.is_enabled()}")
-            print(f"   Next run: {job.schedule().get_next()}")
-    else:
-        print("ℹ️  No cron job installed")
-        print(f"   Run: python {Path(__file__).name} install")
-    return True
+            state = "enabled" if job.is_enabled() else "disabled"
+            print(f"{task.name}: installed, {state}")
+            print(f"  schedule: {job.slices}")
+            print(f"  next run: {job.schedule().get_next()}")
+            print(f"  command: {job.command}")
+    return 0
 
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python setup_cron.py [install|remove|status]")
-        sys.exit(1)
-    
-    command = sys.argv[1].lower()
-    
-    if command == "install":
-        success = install_cron_job()
-    elif command == "remove":
-        success = remove_cron_job()
-    elif command == "status":
-        success = check_status()
-    else:
-        print(f"❌ Unknown command: {command}")
-        sys.exit(1)
-    
-    sys.exit(0 if success else 1)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Install, remove and show project cron jobs.")
+    parser.add_argument("action", choices=("install", "remove", "status"))
+    parser.add_argument(
+        "task",
+        nargs="?",
+        choices=tuple(TASKS),
+        help="which app; defaults to sender. status without a task shows all",
+    )
+    parser.add_argument(
+        "--every",
+        help="how often cron fires: 10m, 1h, 1d, @hourly, or a five-field cron expression",
+    )
+    args = parser.parse_args()
+    if args.every and args.action != "install":
+        parser.error("--every applies to install only")
+    return args
+
+
+def main() -> int:
+    args = parse_args()
+    if args.action == "status" and args.task is None:
+        return status(list(TASKS.values()))
+
+    task = TASKS[args.task or "sender"]
+    if args.action == "install":
+        return install(task, args.every or task.default_every)
+    if args.action == "remove":
+        return remove(task)
+    return status([task])
 
 
 if __name__ == "__main__":
-    main()
-
+    sys.exit(main())
