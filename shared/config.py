@@ -1,6 +1,6 @@
 import json5
 from pathlib import Path
-from typing import Tuple, Dict, Any
+from typing import Any
 
 
 class BaseConfig:
@@ -19,8 +19,8 @@ class BaseConfig:
         self._config_data = self._load_config()
 
         # Telegram credentials (required for all apps)
-        self._api_id = self._config_data.get('telegram_api_id')
-        self._api_hash = self._config_data.get('telegram_api_hash')
+        self._api_id = int(self._required('telegram_api_id'))
+        self._api_hash = str(self._required('telegram_api_hash'))
 
         # PostgreSQL settings (required for all apps)
         self._db_host = self._config_data.get('db_host', 'localhost')
@@ -35,7 +35,7 @@ class BaseConfig:
         self._redis_db = self._config_data.get('redis_db', 0)
         self._redis_password = self._config_data.get('redis_password', None)
 
-        self._target_chat_id = self._config_data.get('target_chat_id')
+        self._target_chat_id = str(self._required('target_chat_id'))
 
         # MinIO settings (required for all apps)
         self._minio_endpoint = self._config_data.get('minio_endpoint', 'localhost:9000')
@@ -47,7 +47,7 @@ class BaseConfig:
         # Local ML model weights (CLIP towers)
         self._models_dir = self._config_data.get('models_dir', 'models')
 
-    def _load_config(self) -> Dict[str, Any]:
+    def _load_config(self) -> dict[str, Any]:
         """Load configuration from JSON file."""
         config_path = self._project_root / 'config.json'
         
@@ -57,21 +57,27 @@ class BaseConfig:
                 f"Please create a config.json file in the project root."
             )
         
-        with open(config_path, 'r') as f:
+        with open(config_path) as f:
             return json5.load(f)
+
+    def _required(self, key: str) -> Any:
+        value = self._config_data.get(key)
+        if value is None:
+            raise ValueError(f"config.json is missing {key}")
+        return value
     
     # ===== Telegram Settings =====
     
     @property
     def api_id(self) -> int:
-        return int(self._api_id)
+        return self._api_id
     
     @property
     def api_hash(self) -> str:
         return self._api_hash
     
     @property
-    def credentials(self) -> Tuple[int, str]:
+    def credentials(self) -> tuple[int, str]:
         return (self.api_id, self.api_hash)
 
     @property

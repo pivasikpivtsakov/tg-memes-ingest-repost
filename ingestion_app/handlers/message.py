@@ -151,139 +151,135 @@ async def save_media_from_message(
     logger.info(f"{media_type.capitalize()} {'duplicate' if is_duplicate else 'saved'}: {file_path}")
 
 
+async def _handle_new_message(client: TelegramClient, event: events.NewMessage.Event) -> None:
+    try:
+        # Album items arrive through the album handler.
+        if event.message.grouped_id is not None:
+            return
+
+        chat_id = event.chat_id
+        if not await allowed_chats.is_allowed(chat_id=chat_id):
+            return
+
+        sender = await event.get_sender()
+        chat = await event.get_chat()
+        sender_id = sender.id
+        sender_name = get_sender_name(sender)
+        chat_title = getattr(chat, 'title', 'Private Chat')
+
+        message_text = event.message.text or '<non-text message>'
+        message_id = event.message.id
+        has_photo = bool(event.message.photo)
+        has_video = bool(event.message.video)
+        has_any_text = bool(event.message.text)
+        is_repost = bool(event.message.fwd_from)
+        has_markup = bool(event.message.reply_markup)
+        should_save = (
+            (has_photo or has_video)
+            and not has_any_text
+            and not is_repost
+            and not has_markup
+        )
+
+        logger.info(
+            f"Message #{message_id} from {sender_name} (ID: {sender_id}) "
+            f"in '{chat_title}' (Chat ID: {chat_id}): {message_text}"
+        )
+
+        if should_save:
+            await save_media_from_message(
+                client,
+                event.message,
+                chat_id=chat_id,
+                sender_id=sender_id,
+                sender_name=sender_name,
+                chat_title=chat_title,
+            )
+    except Exception as e:
+        logger.error(f"Error handling message: {e}", exc_info=True)
+
+
+def _saveable_album_items(messages):
+    eligible = []
+    for position, message in enumerate(messages):
+        if message.photo:
+            eligible.append((position, message))
+            continue
+        if message.video is None:
+            continue
+        if message.video.size > MAX_VIDEO_SIZE_BYTES:
+            logger.info(
+                f"Message #{message.id} video too large "
+                f"({message.video.size / (1024 * 1024):.2f} MB > 50 MB). Skipping."
+            )
+            continue
+        eligible.append((position, message))
+    return eligible
+
+
+async def _handle_album(client: TelegramClient, event: events.Album.Event) -> None:
+    try:
+        chat_id = event.chat_id
+        if not await allowed_chats.is_allowed(chat_id=chat_id):
+            return
+
+        sender = await event.get_sender()
+        chat = await event.get_chat()
+        sender_id = sender.id
+        sender_name = get_sender_name(sender)
+        chat_title = getattr(chat, 'title', 'Private Chat')
+        grouped_id = event.grouped_id
+
+        has_any_text = any(message.text for message in event.messages)
+        is_repost = any(message.fwd_from for message in event.messages)
+        has_markup = any(message.reply_markup for message in event.messages)
+
+        logger.info(
+            f"Album {grouped_id} from {sender_name} (ID: {sender_id}) "
+            f"in '{chat_title}' (Chat ID: {chat_id}): {len(event.messages)} items"
+        )
+
+        if has_any_text or is_repost or has_markup:
+            logger.info(
+                f"Album {grouped_id} skipped "
+                f"(text={bool(has_any_text)}, forward={is_repost}, markup={has_markup})"
+            )
+            return
+
+        eligible = _saveable_album_items(event.messages)
+        if not eligible:
+            return
+
+        use_album = len(eligible) >= 2
+        for position, message in eligible:
+            try:
+                await save_media_from_message(
+                    client,
+                    message,
+                    chat_id=chat_id,
+                    sender_id=sender_id,
+                    sender_name=sender_name,
+                    chat_title=chat_title,
+                    grouped_id=grouped_id if use_album else None,
+                    album_position=position if use_album else None,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error saving album {grouped_id} item #{message.id}: {e}",
+                    exc_info=True,
+                )
+    except Exception as e:
+        logger.error(f"Error handling album: {e}", exc_info=True)
+
+
 def register_message_handler(client: TelegramClient) -> None:
     """Register new message and album event handlers."""
     logger.info("Registering message handler")
 
     @client.on(events.NewMessage())
     async def handle_new_message(event: events.NewMessage.Event) -> None:
-        try:
-            # Skip album messages
-            if event.message.grouped_id is not None:
-                return
-
-            chat_id = event.chat_id
-            if not await allowed_chats.is_allowed(chat_id=chat_id):
-                return
-
-            sender = await event.get_sender()
-            chat = await event.get_chat()
-            
-            # sender.id is always present on all entities
-            sender_id = sender.id
-            
-            # Users have first_name and last_name, Channels have title
-            sender_name = get_sender_name(sender)
-            
-            # Groups/Channels have title, private chats (User) don't
-            chat_title = getattr(chat, 'title', 'Private Chat')
-
-            message_text = event.message.text or '<non-text message>'
-            message_id = event.message.id
-            
-            # Check if message contains a photo
-            has_photo = bool(event.message.photo)
-            
-            # Check if message contains a video (not document)
-            has_video = bool(event.message.video)
-
-            # Check if message contains text
-            has_any_text = bool(event.message.text)
-            
-            # Check if message is a repost (forwarded message)
-            is_repost = bool(event.message.fwd_from)
-
-            has_markup = bool(event.message.reply_markup)
-            
-            should_save = (
-                (has_photo or has_video)
-                and not has_any_text
-                and not is_repost
-                and not has_markup
-            )
-
-            logger.info(
-                f"Message #{message_id} from {sender_name} (ID: {sender_id}) "
-                f"in '{chat_title}' (Chat ID: {chat_id}): {message_text}"
-            )
-            
-            if should_save:
-                await save_media_from_message(
-                    client,
-                    event.message,
-                    chat_id=chat_id,
-                    sender_id=sender_id,
-                    sender_name=sender_name,
-                    chat_title=chat_title,
-                )
-            
-        except Exception as e:
-            logger.error(f"Error handling message: {e}", exc_info=True)
+        await _handle_new_message(client, event)
 
     @client.on(events.Album())
     async def handle_album(event: events.Album.Event) -> None:
-        try:
-            chat_id = event.chat_id
-            if not await allowed_chats.is_allowed(chat_id=chat_id):
-                return
-
-            sender = await event.get_sender()
-            chat = await event.get_chat()
-            sender_id = sender.id
-            sender_name = get_sender_name(sender)
-            chat_title = getattr(chat, 'title', 'Private Chat')
-            grouped_id = event.grouped_id
-
-            has_any_text = any(message.text for message in event.messages)
-            is_repost = any(message.fwd_from for message in event.messages)
-            has_markup = any(message.reply_markup for message in event.messages)
-
-            logger.info(
-                f"Album {grouped_id} from {sender_name} (ID: {sender_id}) "
-                f"in '{chat_title}' (Chat ID: {chat_id}): {len(event.messages)} items"
-            )
-
-            if has_any_text or is_repost or has_markup:
-                logger.info(
-                    f"Album {grouped_id} skipped "
-                    f"(text={bool(has_any_text)}, forward={is_repost}, markup={has_markup})"
-                )
-                return
-
-            eligible = []
-            for position, message in enumerate(event.messages):
-                if message.photo:
-                    eligible.append((position, message))
-                elif message.video:
-                    if message.video.size > MAX_VIDEO_SIZE_BYTES:
-                        logger.info(
-                            f"Message #{message.id} video too large "
-                            f"({message.video.size / (1024 * 1024):.2f} MB > 50 MB). Skipping."
-                        )
-                        continue
-                    eligible.append((position, message))
-
-            if not eligible:
-                return
-
-            use_album = len(eligible) >= 2
-            for position, message in eligible:
-                try:
-                    await save_media_from_message(
-                        client,
-                        message,
-                        chat_id=chat_id,
-                        sender_id=sender_id,
-                        sender_name=sender_name,
-                        chat_title=chat_title,
-                        grouped_id=grouped_id if use_album else None,
-                        album_position=position if use_album else None,
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error saving album {grouped_id} item #{message.id}: {e}",
-                        exc_info=True,
-                    )
-
-        except Exception as e:
-            logger.error(f"Error handling album: {e}", exc_info=True)
+        await _handle_album(client, event)

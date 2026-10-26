@@ -34,7 +34,11 @@ class ClipTextEncoder:
 
     @torch.inference_mode()
     def encode(self, query: str) -> np.ndarray:
-        if self._tower is None:
+        if self._tower is None or self._tokenizer is None:
             self.load()
-        features = self._tower(self._tokenizer([query]))
+        tower = self._tower
+        tokenizer = self._tokenizer
+        if tower is None or tokenizer is None:
+            raise RuntimeError("CLIP text tower is not loaded")
+        features = tower(tokenizer([query]))
         return F.normalize(features, dim=-1)[0].numpy()

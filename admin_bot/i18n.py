@@ -13,7 +13,8 @@ LANGUAGE_NAMES: dict[str, str] = {"ru": "Русский", "en": "English"}
 
 
 def compile_locales() -> None:
-    completed = subprocess.run(
+    # Fixed argv: the interpreter, babel, and paths we own. Not user input.
+    completed = subprocess.run(  # noqa: S603
         [
             sys.executable,
             "-m",

@@ -70,10 +70,13 @@ class MemeTextReader:
 
     def read(self, frames: list[Image.Image]) -> str:
         """Recognized lines of all frames, without lines repeated across video frames."""
+        engine = self._engine
+        if engine is None:
+            raise RuntimeError("OCR engine is not loaded")
         lines: list[str] = []
         seen: set[str] = set()
         for frame in frames:
-            result = self._engine(frame, use_det=True, use_cls=False, use_rec=True)
+            result = engine(frame, use_det=True, use_cls=False, use_rec=True)
             for line in result.txts or ():
                 key = normalize_text(line)
                 if key and key not in seen:

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 _FRAME_MAX_SIDE = 1280
 
 
-class OcrIndexerApp(AbstractIndexerApp[OcrRow]):
+class OcrIndexerApp(AbstractIndexerApp[OcrRow, OcrIndexerConfig]):
     repository_cls = OcrRepository
 
     def __init__(self, config: OcrIndexerConfig):

@@ -2,14 +2,14 @@ import logging
 
 from telethon import TelegramClient
 
-from sender_tg_app.config import config
+from sender_tg_app.config import TelegramSenderConfig, config
 from sender_tg_app.services import MemesSender
 from shared.sender_base import AbstractSenderApp
 
 logger = logging.getLogger(__name__)
 
 
-class TelegramSenderApp(AbstractSenderApp):
+class TelegramSenderApp(AbstractSenderApp[TelegramSenderConfig]):
     async def _run_sender(self) -> int:
         client = TelegramClient(
             self.config.session_name,

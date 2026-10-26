@@ -1,6 +1,6 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from aiogram.utils.i18n import gettext as _
 
 from admin_bot.filters import IsSuperAdmin
@@ -21,7 +21,7 @@ router = Router(name="admins")
 _is_super_admin = IsSuperAdmin()
 
 
-def _panel_view(ids: frozenset[int], super_id: int | None) -> tuple[str, object]:
+def _panel_view(ids: frozenset[int], super_id: int | None) -> tuple[str, InlineKeyboardMarkup]:
     lines: list[str] = []
     if super_id is not None:
         lines.append(f"<code>{super_id}</code> {_('admins.super_suffix')}")

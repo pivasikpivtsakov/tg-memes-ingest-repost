@@ -1,7 +1,7 @@
 """
 Async SQLAlchemy session management. Does not migrate schema.
 """
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -31,7 +31,7 @@ class AsyncDatabaseManager:
         )
 
     @asynccontextmanager
-    async def get_session(self) -> AsyncIterator[AsyncSession]:
+    async def get_session(self) -> AsyncGenerator[AsyncSession]:
         session = self.SessionLocal()
         try:
             yield session

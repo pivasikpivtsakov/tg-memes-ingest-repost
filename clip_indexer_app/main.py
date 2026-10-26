@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 _FRAME_MAX_SIDE = 640
 
 
-class ClipIndexerApp(AbstractIndexerApp[ClipEmbeddingRow]):
+class ClipIndexerApp(AbstractIndexerApp[ClipEmbeddingRow, ClipIndexerConfig]):
     repository_cls = ClipEmbeddingRepository
 
     def __init__(self, config: ClipIndexerConfig):
@@ -54,7 +54,11 @@ class ClipIndexerApp(AbstractIndexerApp[ClipEmbeddingRow]):
         pixels: list[torch.Tensor] = []
         spans: list[tuple[int, int, int]] = []
         failed_ids: list[int] = []
-        for item, media_pixels in zip(items, self._decode_pool.map(self._preprocess, items)):
+        for item, media_pixels in zip(
+            items,
+            self._decode_pool.map(self._preprocess, items),
+            strict=True,
+        ):
             if media_pixels is None:
                 failed_ids.append(item.media.id)
                 continue

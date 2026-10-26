@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 from abc import ABC, abstractmethod
 
 from shared.logger import setup_logging
@@ -9,8 +10,10 @@ from shared.services.media import MediaService
 logger = logging.getLogger(__name__)
 
 
-class AbstractSenderApp(ABC):
-    def __init__(self, config: BaseSenderConfig):
+class AbstractSenderApp[ConfigT: BaseSenderConfig](ABC):
+    config: ConfigT
+
+    def __init__(self, config: ConfigT):
         self.config = config
         self.media_service = self._create_media_service()
 
@@ -52,11 +55,11 @@ class AbstractSenderApp(ABC):
         
         try:
             exit_code = asyncio.run(self.main())
-            exit(exit_code)
+            sys.exit(exit_code)
         except KeyboardInterrupt:
             logger.info("Application stopped by user")
-            exit(0)
+            sys.exit(0)
         except Exception as e:
             logger.error(f"Application error: {e}", exc_info=True)
-            exit(1)
+            sys.exit(1)
 

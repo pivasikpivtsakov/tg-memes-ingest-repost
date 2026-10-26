@@ -59,13 +59,19 @@ class ClipImageEncoder:
         logger.info(f"CLIP vision tower loaded on {self.device}")
 
     def preprocess(self, image: Image.Image) -> torch.Tensor:
-        return self._preprocess(image)
+        preprocess = self._preprocess
+        if preprocess is None:
+            raise RuntimeError("CLIP vision tower is not loaded")
+        return preprocess(image)
 
     @torch.inference_mode()
     def encode(self, pixels: list[torch.Tensor]) -> np.ndarray:
         """L2-normalized embeddings, one row per preprocessed frame."""
+        tower = self._tower
+        if tower is None:
+            raise RuntimeError("CLIP vision tower is not loaded")
         chunks = []
         for start in range(0, len(pixels), self._batch_size):
             batch = torch.stack(pixels[start:start + self._batch_size]).to(self.device)
-            chunks.append(F.normalize(self._tower(batch), dim=-1).float().cpu())
+            chunks.append(F.normalize(tower(batch), dim=-1).float().cpu())
         return torch.cat(chunks).numpy()

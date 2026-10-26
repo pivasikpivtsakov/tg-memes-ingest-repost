@@ -47,3 +47,78 @@ explicit = true
 [build-system]
 requires = ["uv_build>=0.12.22,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.2",
+    "ty>=0.0.92",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E4",   # import errors and syntax that actually breaks
+    "E7",
+    "E9",
+    "F",     # undefined names, unused imports and variables
+    "UP",    # outdated typing and syntax (Optional, List, Dict, ...)
+    "B",     # likely bugs: mutable defaults, raise from, zip
+    "SIM",   # nested or roundabout constructs
+    "C4",    # unnecessary list/dict wrappers
+    "C90",   # cyclomatic complexity
+    "RUF",   # ruff-specific bug checks
+    "PIE",   # unnecessary or misleading constructs
+    "RET",   # unreachable or inconsistent returns
+    "PLE",   # pylint errors: bad except order, logging arity
+    "ASYNC", # missing await and blocking calls in async code
+    "S",     # suspicious subprocess and similar calls
+    "ISC",   # implicit string concatenation
+    "LOG",   # logging calls with the wrong arguments
+    "NPY",   # deprecated numpy aliases
+    "PLR1722",  # sys.exit, not the site builtin exit
+]
+ignore = [
+    "SIM105",  # try/except/pass is easier to read than contextlib.suppress
+    "SIM108",  # if/else stays easier to read than a ternary
+    "SIM116",  # a dict lookup hides branches that an if-chain shows
+    "RET504",  # a named variable before return is easier to follow
+    "RUF001",  # ambiguous unicode: Russian text and meme captions
+    "RUF002",
+    "RUF003",
+    "RUF022",  # __all__ stays in the order the module is read
+    "B027",    # empty methods are optional hooks, not forgotten abstract methods
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Path bootstrap has to run before the first-party imports.
+"scripts/search_memes.py" = ["E402"]
+# `column == False` is a SQL expression. `not column` is not.
+"shared/db/**/*.py" = ["E712"]
+
+[tool.ruff.lint.mccabe]
+# The sender is the most branched function that should stay in one piece.
+max-complexity = 12
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.analysis]
+# Infer return types of functions that have no annotation.
+return-type-inference = "always"
+# Stubs for these packages describe unions and overloads that do not match
+# the runtime we actually call. Treat them as Any so diagnostics stay in our code.
+replace-imports-with-any = [
+    "telethon.**",
+    "av.**",
+    "rapidocr.**",
+    "open_clip.**",
+    "sqlalchemy.engine.**",
+]
+
+[tool.ty.rules]
+# Names used after a branch that may not have assigned them.
+possibly-unresolved-reference = "error"
+division-by-zero = "error"

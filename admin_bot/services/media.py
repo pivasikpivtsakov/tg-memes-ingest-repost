@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from shared.db.repositories.media import MediaMetadata, MediaRepository
 from shared.db.session import AsyncDatabaseManager
@@ -10,7 +10,13 @@ _POSTED_AT_AFTER = timedelta(seconds=40)
 def _as_naive_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt
-    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.astimezone(UTC).replace(tzinfo=None)
+
+
+def _seconds_from_target(posted_at: datetime | None, target: datetime) -> float:
+    if posted_at is None:
+        return float("inf")
+    return abs((posted_at - target).total_seconds())
 
 
 class MediaLookup:
@@ -28,7 +34,7 @@ class MediaLookup:
             return None
         return min(
             candidates,
-            key=lambda item: abs((item.posted_at_tg - target).total_seconds()),
+            key=lambda item: _seconds_from_target(item.posted_at_tg, target),
         )
 
     async def dispose(self) -> None:

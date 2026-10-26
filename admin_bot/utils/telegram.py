@@ -1,5 +1,5 @@
-from contextlib import contextmanager, AbstractContextManager
-from collections.abc import Iterator
+from collections.abc import Generator
+from contextlib import AbstractContextManager, contextmanager
 
 from aiogram.exceptions import TelegramBadRequest
 
@@ -8,7 +8,7 @@ _MESSAGE_GONE = ("message to delete not found", "message can't be deleted", "mes
 
 
 @contextmanager
-def _ignore_bad_request(reasons: tuple[str, ...]) -> Iterator[None]:
+def _ignore_bad_request(reasons: tuple[str, ...]) -> Generator[None]:
     try:
         yield
     except TelegramBadRequest as error:

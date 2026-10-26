@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,6 @@ class PostgresRepository:
         self._db = db
 
     @asynccontextmanager
-    async def _session(self) -> AsyncIterator[AsyncSession]:
+    async def _session(self) -> AsyncGenerator[AsyncSession]:
         async with self._db.get_session() as session:
             yield session

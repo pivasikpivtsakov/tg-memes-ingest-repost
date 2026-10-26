@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import logging
+import sys
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -37,12 +38,13 @@ class IndexBatchResult[RowT]:
     failed_ids: list[int]
 
 
-class AbstractIndexerApp[RowT](ABC):
+class AbstractIndexerApp[RowT, ConfigT: BaseIndexerConfig](ABC):
     """Indexes medias that have no row in the app's table yet; the database is the only queue."""
 
     repository_cls: type[MediaIndexRepository[RowT]]
+    config: ConfigT
 
-    def __init__(self, config: BaseIndexerConfig):
+    def __init__(self, config: ConfigT):
         self.config = config
         self.index_service = self._create_index_service()
         # Undecodable or missing files; retried after a restart.
@@ -207,10 +209,10 @@ class AbstractIndexerApp[RowT](ABC):
             logger.info("=" * 60)
 
             exit_code = asyncio.run(self.main(args))
-            exit(exit_code)
+            sys.exit(exit_code)
         except KeyboardInterrupt:
             logger.info("Application stopped by user")
-            exit(0)
+            sys.exit(0)
         except Exception as e:
             logger.error(f"Application error: {e}", exc_info=True)
-            exit(1)
+            sys.exit(1)

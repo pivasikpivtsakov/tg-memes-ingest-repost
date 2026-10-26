@@ -11,9 +11,8 @@ def is_our_public_chat(chat_id: int, username: str | None, target: str) -> bool:
     target = (target or "").strip()
     if not target:
         return False
-    if username:
-        if username.lower() == target.lower().lstrip("@"):
-            return True
+    if username and username.lower() == target.lower().lstrip("@"):
+        return True
     try:
         return chat_id == int(target)
     except ValueError:

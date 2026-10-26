@@ -2,7 +2,7 @@
 SQLAlchemy ORM models for media storage.
 """
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Literal
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -76,7 +76,7 @@ class Media(Base):
         nullable=False,
         comment="Title of the chat/channel"
     )
-    caption: Mapped[Optional[str]] = mapped_column(
+    caption: Mapped[str | None] = mapped_column(
         Text, 
         nullable=True,
         comment="Original caption/text from message"
@@ -86,12 +86,12 @@ class Media(Base):
         nullable=False,
         comment="Telegram's internal ID for the media file"
     )
-    grouped_id: Mapped[Optional[int]] = mapped_column(
+    grouped_id: Mapped[int | None] = mapped_column(
         BigInteger,
         nullable=True,
         comment="Telegram album grouped_id; NULL for standalone media"
     )
-    album_position: Mapped[Optional[int]] = mapped_column(
+    album_position: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         comment="Order of this media inside the album"
@@ -103,17 +103,17 @@ class Media(Base):
         nullable=False,
         comment="File size in bytes"
     )
-    width: Mapped[Optional[int]] = mapped_column(
+    width: Mapped[int | None] = mapped_column(
         Integer, 
         nullable=True,
         comment="Media width in pixels"
     )
-    height: Mapped[Optional[int]] = mapped_column(
+    height: Mapped[int | None] = mapped_column(
         Integer, 
         nullable=True,
         comment="Media height in pixels"
     )
-    duration: Mapped[Optional[int]] = mapped_column(
+    duration: Mapped[int | None] = mapped_column(
         Integer, 
         nullable=True,
         comment="Duration in seconds (videos only)"
@@ -123,12 +123,12 @@ class Media(Base):
         nullable=False,
         comment="MIME type of the media file"
     )
-    video_codec: Mapped[Optional[str]] = mapped_column(
+    video_codec: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="Video codec reported by Telegram source (e.g. 'h264', 'h265', 'av1'); videos only"
     )
-    round_message: Mapped[Optional[bool]] = mapped_column(
+    round_message: Mapped[bool | None] = mapped_column(
         Boolean,
         nullable=True,
         comment="Whether the source video is a round video note (circular message); videos only"

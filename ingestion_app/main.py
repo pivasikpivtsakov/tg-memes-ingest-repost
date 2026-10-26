@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 
 from telethon import TelegramClient
 
@@ -50,7 +51,7 @@ def run() -> None:
         logger.info("Application stopped by user")
     except Exception as e:
         logger.error(f"Application error: {e}", exc_info=True)
-        exit(1)
+        sys.exit(1)
 
 
 if __name__ == '__main__':
