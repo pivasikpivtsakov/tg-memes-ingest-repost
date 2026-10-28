@@ -1,0 +1,15 @@
+---
+description: Run Ruff and ty after Python edits and fix until both are clean
+alwaysApply: true
+---
+
+# Lint after code changes
+
+After changing Python code, run both linters from the project root:
+
+```bash
+uv run ruff check .
+uv run ty check
+```
+
+Fix every diagnostic they report, then run both commands again. Repeat until both finish with no diagnostics. Do not turn rules off or add ignore comments to get a clean run. Change the linter configuration only when the user asks for that.

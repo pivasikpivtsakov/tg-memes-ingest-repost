@@ -1,0 +1,10 @@
+---
+description: Do not auto-migrate the database from application code
+alwaysApply: true
+---
+
+# No database migrations in code
+
+Never apply schema changes from the application. Do not add `_ensure_schema` or any startup/runtime SQL that `ALTER`s, `DROP`s, or otherwise migrates existing tables, columns, indexes, or constraints.
+
+When a schema change is needed, change the SQLAlchemy models and give the user the exact SQL to run manually. Do not execute that SQL from Python.
