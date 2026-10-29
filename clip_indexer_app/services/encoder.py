@@ -9,8 +9,13 @@ from open_clip.model import _build_vision_tower
 from PIL import Image
 from safetensors.torch import load_file
 
-from shared.device import resolve_device, torch_cuda_available, validate_device
-from shared.search.clip import CLIP_MODEL_NAME, CLIP_PRETRAINED, ensure_tower_weights
+from shared.device import DeviceChoice, resolve_device, torch_cuda_available
+from shared.search.clip import (
+    CLIP_MODEL_NAME,
+    CLIP_PRETRAINED,
+    ClipTower,
+    ensure_tower_weights,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +23,11 @@ logger = logging.getLogger(__name__)
 class ClipImageEncoder:
     """Vision tower only: the text tower is 3x larger and not needed for indexing."""
 
-    def __init__(self, *, models_dir: Path, device: str, batch_size: int) -> None:
+    def __init__(self, *, models_dir: Path, device: DeviceChoice, batch_size: int) -> None:
         self._models_dir = models_dir
         self._batch_size = batch_size
-        self._device_request = "cpu"
+        self._device_request = device
         self._device: torch.device | None = None
-        self.device = device
         self._tower: torch.nn.Module | None = None
         self._preprocess = None
 
@@ -37,14 +41,14 @@ class ClipImageEncoder:
         return self._device
 
     @device.setter
-    def device(self, device: str) -> None:
-        self._device_request = validate_device(device)
+    def device(self, device: DeviceChoice) -> None:
+        self._device_request = device
         self._device = None
 
     def load(self) -> None:
         model_cfg = open_clip.get_model_config(CLIP_MODEL_NAME)
         tower = _build_vision_tower(model_cfg["embed_dim"], model_cfg["vision_cfg"])
-        tower.load_state_dict(load_file(ensure_tower_weights(self._models_dir, "visual")))
+        tower.load_state_dict(load_file(ensure_tower_weights(self._models_dir, ClipTower.VISUAL)))
         self._tower = tower.eval().to(self.device)
 
         preprocess_cfg = open_clip.get_pretrained_cfg(CLIP_MODEL_NAME, CLIP_PRETRAINED)

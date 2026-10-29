@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Collection
-from typing import ClassVar, Literal
+from enum import StrEnum
+from typing import ClassVar
 
 from sqlalchemy import exists, func, select
 
@@ -8,7 +9,10 @@ from shared.db.models import Media, MediaClipEmbedding, MediaOcr
 from shared.db.repositories.base import PostgresRepository
 from shared.db.repositories.media import MediaMetadata
 
-IndexOrder = Literal["asc", "desc"]
+
+class IndexOrder(StrEnum):
+    ASC = "asc"
+    DESC = "desc"
 
 
 class MediaIndexRepository[RowT](PostgresRepository, ABC):
@@ -33,7 +37,7 @@ class MediaIndexRepository[RowT](PostgresRepository, ABC):
         stmt = select(Media).where(self._not_indexed())
         if exclude_ids:
             stmt = stmt.where(Media.id.not_in(list(exclude_ids)))
-        stmt = stmt.order_by(Media.id.desc() if order == "desc" else Media.id.asc()).limit(limit)
+        stmt = stmt.order_by(Media.id.desc() if order == IndexOrder.DESC else Media.id.asc()).limit(limit)
         async with self._session() as session:
             results = await session.execute(stmt)
             return [MediaMetadata.model_validate(media) for media in results.scalars().all()]

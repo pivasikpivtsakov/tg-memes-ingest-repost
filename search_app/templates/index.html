@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Поиск мемов</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js"
+          integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg"
+          crossorigin="anonymous"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px) + 12px)
+               12px
+               calc(var(--tg-safe-area-inset-bottom, 0px) + 12px);
+      font-family: system-ui, sans-serif;
+      background: var(--tg-theme-bg-color, #fff);
+      color: var(--tg-theme-text-color, #000);
+    }
+    #search { display: flex; gap: 8px; }
+    #search[hidden] { display: none; }
+    #search input {
+      flex: 1;
+      min-width: 0;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid var(--tg-theme-hint-color, #999);
+      border-radius: 8px;
+      background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+      color: inherit;
+    }
+    #search button {
+      padding: 10px 16px;
+      font-size: 16px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--tg-theme-button-color, #2481cc);
+      color: var(--tg-theme-button-text-color, #fff);
+    }
+    #search button:disabled { opacity: 0.5; }
+    .hint, .timings { color: var(--tg-theme-hint-color, #999); font-size: 13px; }
+    .error { color: var(--tg-theme-destructive-text-color, #d00); }
+    .hits { list-style: none; padding: 0; margin: 0; }
+    .hit {
+      margin: 12px 0;
+      padding: 8px;
+      border-radius: 8px;
+      background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+    }
+    .hit img, .hit video { display: block; width: 100%; max-height: 60vh; object-fit: contain; }
+    .hit .meta { margin-top: 6px; font-size: 14px; }
+    .hit table { width: 100%; font-size: 13px; border-collapse: collapse; text-align: left; }
+    .hit th { color: var(--tg-theme-hint-color, #999); font-weight: normal; }
+    .hit .ocr { white-space: pre-line; font-size: 14px; margin: 6px 0 0; }
+  </style>
+</head>
+<body>
+  <p id="status" class="hint">Вход…</p>
+  <form id="search" hidden
+        hx-post="api/search" hx-target="#results" hx-swap="innerHTML"
+        hx-disabled-elt="#search button">
+    <input name="query" type="search" required autocomplete="off" placeholder="Текст, шаблон или сцена">
+    <button type="submit">Найти</button>
+  </form>
+  <div id="results"></div>
+  <script>
+    const fullScreenPlatforms = ['ios', 'android', 'android_x'];
+    const tgWebApp = window.Telegram?.WebApp;
+    const statusLine = document.getElementById('status');
+    const form = document.getElementById('search');
+    let token = null;
+
+    if (tgWebApp) {
+      tgWebApp.disableVerticalSwipes?.();
+      tgWebApp.expand();
+      try {
+        if (fullScreenPlatforms.includes(tgWebApp.platform)) {
+          tgWebApp.requestFullscreen();
+        }
+      } catch {
+        // requestFullscreen not supported (Bot API < 8.0)
+      }
+      tgWebApp.ready();
+    }
+
+    function showAuthError(message) {
+      statusLine.textContent = message;
+      statusLine.className = 'error';
+    }
+
+    async function authenticate() {
+      const initData = tgWebApp?.initData;
+      if (!initData) {
+        showAuthError('Откройте приложение из Telegram');
+        return;
+      }
+      try {
+        const response = await fetch('api/auth/telegram?' + new URLSearchParams({ init_data: initData }));
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          showAuthError(typeof body.detail === 'string' ? body.detail : `Ошибка входа: ${response.status}`);
+          return;
+        }
+        token = body.token;
+        statusLine.hidden = true;
+        form.hidden = false;
+      } catch (e) {
+        showAuthError(`Ошибка входа: ${e.message}`);
+      }
+    }
+
+    document.body.addEventListener('htmx:configRequest', (event) => {
+      if (token) {
+        event.detail.headers['Authorization'] = `Bearer ${token}`;
+      }
+    });
+    document.body.addEventListener('htmx:beforeSwap', (event) => {
+      if (event.detail.xhr.status === 401) {
+        event.detail.shouldSwap = true;
+        event.detail.isError = false;
+      }
+    });
+
+    authenticate();
+  </script>
+</body>
+</html>

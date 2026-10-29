@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from shared.db.repositories.media import MediaMetadata
 from shared.db.repositories.media_index import IndexOrder, MediaIndexRepository
-from shared.device import add_device_argument
+from shared.device import DeviceChoice, add_device_argument
 from shared.indexer_base.config import BaseIndexerConfig
 from shared.logger import setup_logging
 from shared.services.media_index import MediaIndexService
@@ -171,7 +171,7 @@ class AbstractIndexerApp[RowT, ConfigT: BaseIndexerConfig](ABC):
     def _extend_parser(self, parser: argparse.ArgumentParser) -> None:
         pass
 
-    def _apply_device(self, device: str) -> None:
+    def _apply_device(self, device: DeviceChoice) -> None:
         raise RuntimeError(f"{type(self).__name__} does not accept --device")
 
     def _apply_args(self, args: argparse.Namespace) -> None:
@@ -186,8 +186,9 @@ class AbstractIndexerApp[RowT, ConfigT: BaseIndexerConfig](ABC):
         )
         parser.add_argument(
             "--order",
-            choices=("desc", "asc"),
-            default="desc",
+            type=IndexOrder,
+            choices=list(IndexOrder),
+            default=IndexOrder.DESC,
             help="desc: newest medias first (daemon); asc: oldest first (archive backfill)",
         )
         add_device_argument(parser)

@@ -20,7 +20,7 @@ def load_frames(
     max_side: int,
 ) -> list[Image.Image]:
     """RGB frames of a media: the photo itself, or frames evenly spread over a video."""
-    if media_type == "photo":
+    if media_type == MediaType.PHOTO:
         return [_load_photo(data, max_side=max_side)]
     return _sample_video(data, count=video_frames, max_side=max_side)
 

@@ -2,7 +2,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Literal
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
@@ -10,8 +10,12 @@ CLIP_MODEL_NAME = "xlm-roberta-base-ViT-B-32"
 CLIP_PRETRAINED = "laion5b_s13b_b90k"
 CLIP_MODEL_TAG = f"{CLIP_MODEL_NAME}/{CLIP_PRETRAINED}"
 
-ClipTower = Literal["visual", "text"]
-_TOWERS: tuple[ClipTower, ...] = ("visual", "text")
+
+class ClipTower(StrEnum):
+    VISUAL = "visual"
+    TEXT = "text"
+
+
 _CHECKPOINT_FILENAME = "open_clip_pytorch_model.bin"
 
 
@@ -36,7 +40,7 @@ def _extract_towers(models_dir: Path) -> None:
     from huggingface_hub import hf_hub_download
 
     repo_id = open_clip.get_pretrained_cfg(CLIP_MODEL_NAME, CLIP_PRETRAINED)["hf_hub"].rstrip("/")
-    target_dir = tower_weights_path(models_dir, "visual").parent
+    target_dir = tower_weights_path(models_dir, ClipTower.VISUAL).parent
     target_dir.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(dir=target_dir) as download_dir:
@@ -51,7 +55,7 @@ def extract_towers_from_checkpoint(checkpoint_path: Path, models_dir: Path) -> N
 
     checkpoint = torch.load(checkpoint_path, map_location="cpu", mmap=True, weights_only=True)
     state_dict = checkpoint.get("state_dict", checkpoint)
-    for tower in _TOWERS:
+    for tower in ClipTower:
         prefixes = (f"module.{tower}.", f"{tower}.")
         tensors = {
             key.removeprefix(prefixes[0]).removeprefix(prefixes[1]): tensor.contiguous()

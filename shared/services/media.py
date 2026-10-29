@@ -87,7 +87,7 @@ class MediaService:
             logger.info(f"Duplicate {media_type} detected (hash: {file_hash[:8]}...)")
             return existing_path, True
 
-        if media_type == "photo":
+        if media_type == MediaType.PHOTO:
             extension = file_extension or "jpg"
             content_type = mime_type or "image/jpeg"
         else:

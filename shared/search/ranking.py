@@ -1,8 +1,13 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Literal
+from enum import StrEnum
 
-Channel = Literal["exact", "trgm", "clip"]
+
+class Channel(StrEnum):
+    EXACT = "exact"
+    TRGM = "trgm"
+    CLIP = "clip"
+
 
 # Each channel returns this many candidates; fusion only reorders them.
 CANDIDATE_LIMIT = 50
@@ -11,8 +16,16 @@ _RRF_K = 60
 
 # Longer queries are usually a remembered phrase; one or two words more often name a template or scene.
 _PHRASE_MIN_WORDS = 3
-_PHRASE_WEIGHTS: dict[Channel, float] = {"exact": 1.0, "trgm": 1.0, "clip": 0.5}
-_SHORT_WEIGHTS: dict[Channel, float] = {"exact": 1.0, "trgm": 0.6, "clip": 1.0}
+_PHRASE_WEIGHTS: dict[Channel, float] = {
+    Channel.EXACT: 1.0,
+    Channel.TRGM: 1.0,
+    Channel.CLIP: 0.5,
+}
+_SHORT_WEIGHTS: dict[Channel, float] = {
+    Channel.EXACT: 1.0,
+    Channel.TRGM: 0.6,
+    Channel.CLIP: 1.0,
+}
 
 
 @dataclass(frozen=True)
@@ -39,9 +52,9 @@ def fuse(
     """Reciprocal Rank Fusion. Exact hits sort ahead of the fused score."""
     grouped: dict[int, dict[Channel, ChannelMatch]] = defaultdict(dict)
     ranked: dict[Channel, list[tuple[int, float]]] = {
-        "exact": exact,
-        "trgm": trigram,
-        "clip": clip,
+        Channel.EXACT: exact,
+        Channel.TRGM: trigram,
+        Channel.CLIP: clip,
     }
     for channel, matches in ranked.items():
         for rank, (media_id, score) in enumerate(matches, start=1):
@@ -54,7 +67,7 @@ def fuse(
     }
     chosen = sorted(
         scored,
-        key=lambda media_id: ("exact" in grouped[media_id], scored[media_id]),
+        key=lambda media_id: (Channel.EXACT in grouped[media_id], scored[media_id]),
         reverse=True,
     )[:limit]
     return [

@@ -5,7 +5,13 @@ from PIL import Image
 from rapidocr import RapidOCR
 from rapidocr.utils.typings import EngineType, LangDet, LangRec, ModelType, OCRVersion
 
-from shared.device import onnx_cuda_available, require_cuda_provider, resolve_device, validate_device
+from shared.device import (
+    DeviceChoice,
+    DeviceName,
+    onnx_cuda_available,
+    require_cuda_provider,
+    resolve_device,
+)
 from shared.search.text import normalize_text
 
 OCR_ENGINE_TAG = f"rapidocr-{version('rapidocr')}/PP-OCRv5-mobile-det/eslav-PP-OCRv5-mobile-rec"
@@ -14,16 +20,21 @@ OCR_ENGINE_TAG = f"rapidocr-{version('rapidocr')}/PP-OCRv5-mobile-det/eslav-PP-O
 class MemeTextReader:
     """RapidOCR with the East Slavic + English recognizer and no orientation classifier."""
 
-    def __init__(self, *, models_dir: Path, threads: int, device: str = "cpu") -> None:
+    def __init__(
+        self,
+        *,
+        models_dir: Path,
+        threads: int,
+        device: DeviceChoice = DeviceChoice.CPU,
+    ) -> None:
         self._models_dir = models_dir / "rapidocr"
         self._threads = threads
-        self._device_request = "cpu"
-        self._resolved_device: str | None = None
-        self.device = device
+        self._device_request = device
+        self._resolved_device: DeviceName | None = None
         self._engine: RapidOCR | None = None
 
     @property
-    def device(self) -> str:
+    def device(self) -> DeviceName:
         if self._resolved_device is None:
             self._resolved_device = resolve_device(
                 self._device_request,
@@ -33,12 +44,12 @@ class MemeTextReader:
         return self._resolved_device
 
     @device.setter
-    def device(self, device: str) -> None:
-        self._device_request = validate_device(device)
+    def device(self, device: DeviceChoice) -> None:
+        self._device_request = device
         self._resolved_device = None
 
     def load(self) -> None:
-        use_cuda = self.device == "cuda"
+        use_cuda = self.device == DeviceName.CUDA
         self._models_dir.mkdir(parents=True, exist_ok=True)
         self._engine = RapidOCR(params={
             "Global.use_cls": False,

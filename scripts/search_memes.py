@@ -8,7 +8,8 @@ from time import perf_counter
 _import_started = perf_counter()
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from shared.config import BaseConfig
+from search_app.config import config
+from shared.db.session import AsyncDatabaseManager
 from shared.logger import setup_logging
 from shared.search.service import SearchHit, SearchService, SearchTimings
 
@@ -44,21 +45,20 @@ def _format_timings(timings: SearchTimings) -> str:
 
 
 async def main(query: str, limit: int, explain: bool) -> None:
-    config = BaseConfig()
-    service = SearchService(database_url=config.database_url, models_dir=config.models_dir)
+    db = AsyncDatabaseManager(config.database_url)
+    service = SearchService(db=db, models_dir=config.models_dir, device=config.search_device)
     try:
-        hits = await service.search(query, limit=limit)
-        timings = service.last_timings
+        service.load()
+        hits, timings = await service.search(query, limit=limit)
     finally:
-        await service.dispose()
+        await db.dispose()
 
     if not hits:
         print("Nothing found")
     else:
         for position, hit in enumerate(hits, start=1):
             print(_format_hit(position, hit, explain=explain))
-    if timings is not None:
-        print(_format_timings(timings))
+    print(_format_timings(timings))
 
 
 if __name__ == '__main__':
@@ -67,5 +67,5 @@ if __name__ == '__main__':
     parser.add_argument('-k', '--limit', type=int, default=20)
     parser.add_argument('--explain', action='store_true', help="show which channels matched each meme")
     args = parser.parse_args()
-    setup_logging(logging.WARNING)
+    setup_logging(logging.INFO)
     asyncio.run(main(query=args.query, limit=args.limit, explain=args.explain))

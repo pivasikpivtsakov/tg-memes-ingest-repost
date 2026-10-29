@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -7,38 +8,50 @@ import torch.nn.functional as F
 from open_clip.model import _build_text_tower
 from safetensors.torch import load_file
 
-from shared.search.clip import CLIP_MODEL_NAME, ensure_tower_weights
+from shared.device import DeviceChoice, resolve_device, torch_cuda_available
+from shared.search.clip import CLIP_MODEL_NAME, ClipTower, ensure_tower_weights
+
+logger = logging.getLogger(__name__)
 
 
 class ClipTextEncoder:
-    """Text tower of the multilingual CLIP; runs on CPU next to the indexing daemons."""
+    """Text tower of the multilingual CLIP."""
 
-    def __init__(self, *, models_dir: Path) -> None:
+    def __init__(self, *, models_dir: Path, device: DeviceChoice) -> None:
         self._models_dir = models_dir
+        self._device_request = device
+        self._device: torch.device | None = None
         self._tower: torch.nn.Module | None = None
         self._tokenizer = None
 
     def load(self) -> None:
+        device = torch.device(resolve_device(
+            self._device_request,
+            cuda_available=torch_cuda_available,
+        ))
         model_cfg = open_clip.get_model_config(CLIP_MODEL_NAME)
         text_cfg = {**model_cfg["text_cfg"], "hf_model_pretrained": False}
         tower = _build_text_tower(model_cfg["embed_dim"], text_cfg)
         # The checkpoint carries a position_ids buffer that newer transformers no longer register.
         missing, _ = tower.load_state_dict(
-            load_file(ensure_tower_weights(self._models_dir, "text")),
+            load_file(ensure_tower_weights(self._models_dir, ClipTower.TEXT)),
             strict=False,
         )
         if missing:
             raise RuntimeError(f"CLIP text weights are missing keys: {missing}")
-        self._tower = tower.eval()
+        self._tower = tower.eval().to(device)
         self._tokenizer = open_clip.get_tokenizer(CLIP_MODEL_NAME)
+        self._device = device
+        # The first call sets padding on the Rust tokenizer; concurrent first calls would race on it.
+        self.encode("")
+        logger.info(f"CLIP text tower loaded on {device}")
 
     @torch.inference_mode()
     def encode(self, query: str) -> np.ndarray:
-        if self._tower is None or self._tokenizer is None:
-            self.load()
         tower = self._tower
         tokenizer = self._tokenizer
-        if tower is None or tokenizer is None:
+        device = self._device
+        if tower is None or tokenizer is None or device is None:
             raise RuntimeError("CLIP text tower is not loaded")
-        features = tower(tokenizer([query]))
-        return F.normalize(features, dim=-1)[0].numpy()
+        features = tower(tokenizer([query]).to(device))
+        return F.normalize(features, dim=-1)[0].float().cpu().numpy()

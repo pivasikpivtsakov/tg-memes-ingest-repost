@@ -3,6 +3,7 @@ import logging
 from ocr_indexer_app.config import OcrIndexerConfig, config
 from ocr_indexer_app.services import OCR_ENGINE_TAG, MemeTextReader
 from shared.db.repositories import OcrRepository, OcrRow
+from shared.device import DeviceChoice
 from shared.indexer_base import AbstractIndexerApp, DownloadedMedia, IndexBatchResult
 from shared.search.frames import load_frames
 from shared.search.text import normalize_text
@@ -25,7 +26,7 @@ class OcrIndexerApp(AbstractIndexerApp[OcrRow, OcrIndexerConfig]):
             device=config.ocr_device,
         )
 
-    def _apply_device(self, device: str) -> None:
+    def _apply_device(self, device: DeviceChoice) -> None:
         self.reader.device = device
 
     def _load_model(self) -> None:

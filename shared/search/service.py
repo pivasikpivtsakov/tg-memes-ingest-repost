@@ -7,6 +7,7 @@ from time import perf_counter
 from shared.db.repositories import ClipEmbeddingRepository, MediaRepository, OcrRepository
 from shared.db.repositories.media import MediaMetadata
 from shared.db.session import AsyncDatabaseManager
+from shared.device import DeviceChoice
 from shared.search.clip_search import ClipSearch
 from shared.search.ocr_search import OcrSearch
 from shared.search.ranking import Channel, ChannelMatch, fuse
@@ -35,7 +36,7 @@ class SearchHit:
 
     @property
     def exact(self) -> bool:
-        return "exact" in self.channels
+        return Channel.EXACT in self.channels
 
 
 class _StageClock:
@@ -53,25 +54,37 @@ class _StageClock:
 class SearchService:
     """Exact phrase matches first, then Reciprocal Rank Fusion of trigram and CLIP results."""
 
-    def __init__(self, *, database_url: str, models_dir: Path) -> None:
-        db = AsyncDatabaseManager(database_url)
-        self._db = db
+    def __init__(
+        self,
+        *,
+        db: AsyncDatabaseManager,
+        models_dir: Path,
+        device: DeviceChoice,
+    ) -> None:
         self._media = MediaRepository(db)
         self._ocr = OcrSearch(OcrRepository(db))
-        self._clip = ClipSearch(ClipEmbeddingRepository(db), models_dir=models_dir)
-        self.last_timings: SearchTimings | None = None
+        self._clip = ClipSearch(
+            ClipEmbeddingRepository(db),
+            models_dir=models_dir,
+            device=device,
+        )
 
-    async def dispose(self) -> None:
-        await self._db.dispose()
+    def load(self) -> None:
+        self._clip.load()
 
-    async def search(self, query: str, *, limit: int = 20) -> list[SearchHit]:
+    async def search(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> tuple[list[SearchHit], SearchTimings]:
         started = perf_counter()
         query_norm = normalize_text(query)
         if not query_norm:
-            self.last_timings = SearchTimings(
+            timings = SearchTimings(
                 total=0, parallel=0, exact=0, trigram=0, encode=0, clip=0, hydrate=0,
             )
-            return []
+            return [], timings
 
         clock = _StageClock()
         exact, trigram, embedding = await clock.measure(
@@ -92,7 +105,7 @@ class SearchService:
                 self._ocr.get_texts(media_ids),
             ),
         )
-        self.last_timings = SearchTimings(
+        timings = SearchTimings(
             total=perf_counter() - started,
             parallel=clock.elapsed["parallel"],
             exact=clock.elapsed["exact"],
@@ -101,7 +114,7 @@ class SearchService:
             clip=clock.elapsed["clip"],
             hydrate=clock.elapsed["hydrate"],
         )
-        return [
+        hits = [
             SearchHit(
                 media=medias[hit.media_id],
                 text=texts.get(hit.media_id),
@@ -111,3 +124,4 @@ class SearchService:
             for hit in fused
             if hit.media_id in medias
         ]
+        return hits, timings

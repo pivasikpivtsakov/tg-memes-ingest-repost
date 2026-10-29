@@ -4,6 +4,7 @@ from telethon import events, TelegramClient
 from telethon.tl.types import DocumentAttributeVideo, DocumentAttributeFilename, DocumentAttributeSticker
 
 from ingestion_app.config import config
+from shared.db.models import MediaType
 from shared.redis import create_redis
 from shared.services import AllowedChatsService, MediaService
 
@@ -89,7 +90,7 @@ async def save_media_from_message(
         width = getattr(largest_size, 'w', None)
         height = getattr(largest_size, 'h', None)
 
-        media_type = "photo"
+        media_type = MediaType.PHOTO
         telegram_id = photo.id
         duration = None
         video_codec = None
@@ -118,7 +119,7 @@ async def save_media_from_message(
         width, height, duration, video_codec, round_message, video_sticker, filename = extract_video_attributes(video)
         file_extension = determine_video_extension(video, filename)
 
-        media_type = "video"
+        media_type = MediaType.VIDEO
         telegram_id = video.id
         mime_type = video.mime_type
         created_at = video.date

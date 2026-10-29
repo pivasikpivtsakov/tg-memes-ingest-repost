@@ -12,6 +12,7 @@ from telethon.tl.types import (
 )
 
 from sender_tg_app.services.video_thumbnail import generate_video_thumbnail, needs_own_thumbnail
+from shared.db.models import MediaType
 from shared.services.media import MediaMetadata, MediaService
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,7 @@ class MemesSender:
             bool: True if sent successfully, False otherwise
         """
         media_type = media.media_type
-        is_video = (media_type == "video")
+        is_video = media_type == MediaType.VIDEO
         
         # Retrieve media data from MinIO
         try:

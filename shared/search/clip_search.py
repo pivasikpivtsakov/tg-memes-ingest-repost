@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 
 from shared.db.repositories import ClipEmbeddingRepository
+from shared.device import DeviceChoice
 from shared.search.clip_text import ClipTextEncoder
 from shared.search.ranking import CANDIDATE_LIMIT
 
@@ -14,9 +15,18 @@ _HNSW_EF_SEARCH = 100
 class ClipSearch:
     """Nearest meme images for a text query. Score is cosine similarity (1 - distance)."""
 
-    def __init__(self, embeddings: ClipEmbeddingRepository, *, models_dir: Path) -> None:
+    def __init__(
+        self,
+        embeddings: ClipEmbeddingRepository,
+        *,
+        models_dir: Path,
+        device: DeviceChoice,
+    ) -> None:
         self._embeddings = embeddings
-        self._encoder = ClipTextEncoder(models_dir=models_dir)
+        self._encoder = ClipTextEncoder(models_dir=models_dir, device=device)
+
+    def load(self) -> None:
+        self._encoder.load()
 
     async def encode(self, query: str) -> np.ndarray:
         return await asyncio.to_thread(self._encoder.encode, query.strip())

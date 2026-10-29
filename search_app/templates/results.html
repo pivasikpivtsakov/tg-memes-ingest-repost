@@ -1,0 +1,39 @@
+<p class="timings">
+  {{ "%.2f"|format(timings.total) }} с
+  · exact {{ "%.2f"|format(timings.exact) }}
+  · trgm {{ "%.2f"|format(timings.trigram) }}
+  · encode {{ "%.2f"|format(timings.encode) }}
+  · clip {{ "%.2f"|format(timings.clip) }}
+  · hydrate {{ "%.2f"|format(timings.hydrate) }}
+</p>
+{% if not hits %}
+<p>Ничего не найдено</p>
+{% else %}
+<ol class="hits">
+  {% for hit in hits %}
+  {% set url = media_base_url ~ "/" ~ hit.media.file_path %}
+  <li class="hit">
+    {% if hit.media.media_type == MediaType.VIDEO %}
+    <video src="{{ url }}" controls playsinline webkit-playsinline preload="metadata"></video>
+    {% else %}
+    <img src="{{ url }}" alt="" loading="lazy">
+    {% endif %}
+    <div class="meta">
+      {{ loop.index }}. #{{ hit.media.id }} · {{ hit.media.media_type }}
+      {% if hit.exact %}· <b>exact</b>{% endif %}
+      · rrf {{ "%.4f"|format(hit.score) }}
+    </div>
+    <table>
+      <tr>{% for channel in Channel %}<th>{{ channel }}</th>{% endfor %}</tr>
+      <tr>
+        {% for channel in Channel %}
+        {% set match = hit.channels.get(channel) %}
+        <td>{% if match %}#{{ match.rank }} ({{ "%.2f"|format(match.score) }}){% endif %}</td>
+        {% endfor %}
+      </tr>
+    </table>
+    {% if hit.text %}<p class="ocr">{{ hit.text }}</p>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}

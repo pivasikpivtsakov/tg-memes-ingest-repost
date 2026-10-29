@@ -7,6 +7,7 @@ import torch
 from clip_indexer_app.config import ClipIndexerConfig, config
 from clip_indexer_app.services import ClipImageEncoder
 from shared.db.repositories import ClipEmbeddingRepository, ClipEmbeddingRow
+from shared.device import DeviceChoice
 from shared.indexer_base import AbstractIndexerApp, DownloadedMedia, IndexBatchResult
 from shared.search.clip import CLIP_MODEL_TAG
 from shared.search.frames import load_frames
@@ -30,7 +31,7 @@ class ClipIndexerApp(AbstractIndexerApp[ClipEmbeddingRow, ClipIndexerConfig]):
         )
         self._decode_pool = ThreadPoolExecutor(max_workers=config.clip_decode_threads)
 
-    def _apply_device(self, device: str) -> None:
+    def _apply_device(self, device: DeviceChoice) -> None:
         self.encoder.device = device
 
     def _load_model(self) -> None:

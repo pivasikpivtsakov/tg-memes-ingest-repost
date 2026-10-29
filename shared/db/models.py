@@ -2,7 +2,7 @@
 SQLAlchemy ORM models for media storage.
 """
 from datetime import datetime
-from typing import Literal
+from enum import StrEnum
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -13,7 +13,11 @@ from sqlalchemy.sql import func, text
 
 from shared.db.base import Base
 
-MediaType = Literal["photo", "video"]
+
+class MediaType(StrEnum):
+    PHOTO = "photo"
+    VIDEO = "video"
+
 
 CLIP_EMBEDDING_DIM = 512
 
@@ -246,6 +250,21 @@ class MediaClipEmbedding(Base):
             postgresql_using='hnsw',
             postgresql_ops={'embedding': 'vector_cosine_ops'},
         ),
+    )
+
+
+class User(Base):
+    """Telegram user who opened the search mini app. Username is not unique: it can change hands."""
+    __tablename__ = 'users'
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    first_name: Mapped[str] = mapped_column(Text, nullable=False)
+    last_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    username: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
     )
 
 

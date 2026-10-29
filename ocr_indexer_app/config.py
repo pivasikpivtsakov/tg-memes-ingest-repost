@@ -1,4 +1,4 @@
-from shared.device import validate_device
+from shared.device import DeviceChoice, validate_device
 from shared.indexer_base import BaseIndexerConfig
 
 
@@ -15,7 +15,7 @@ class OcrIndexerConfig(BaseIndexerConfig):
         self._ocr_video_frames = self._config_data.get('ocr_video_frames', 4)
 
     @property
-    def ocr_device(self) -> str:
+    def ocr_device(self) -> DeviceChoice:
         """'cpu' (default; the 1060 stays free), 'cuda', or 'auto' when ONNX Runtime has CUDA."""
         return validate_device(str(self._ocr_device), name='ocr_device')
 

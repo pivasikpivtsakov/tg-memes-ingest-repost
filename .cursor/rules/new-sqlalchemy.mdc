@@ -1,0 +1,5 @@
+---
+description: when writing sqlalchemy models
+alwaysApply: false
+---
+prefer sqlalchemy 2 style with mapped_column(DbColumnType) and Mapped[PythonType]

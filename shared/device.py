@@ -7,34 +7,40 @@ CUDA builds.
 
 import argparse
 from collections.abc import Callable, Sequence
-from typing import Literal
+from enum import StrEnum
 
-DeviceChoice = Literal["auto", "cpu", "cuda"]
-DeviceName = Literal["cpu", "cuda"]
 
-DEVICE_CHOICES: tuple[DeviceChoice, ...] = ("auto", "cpu", "cuda")
+class DeviceChoice(StrEnum):
+    AUTO = "auto"
+    CPU = "cpu"
+    CUDA = "cuda"
+
+
+class DeviceName(StrEnum):
+    CPU = "cpu"
+    CUDA = "cuda"
 
 
 def validate_device(device: str, *, name: str = "device") -> DeviceChoice:
-    if device not in DEVICE_CHOICES:
-        raise ValueError(f"{name} must be 'auto', 'cpu' or 'cuda', got {device!r}")
-    return device  # type: ignore[return-value]
+    try:
+        return DeviceChoice(device)
+    except ValueError as e:
+        raise ValueError(f"{name} must be 'auto', 'cpu' or 'cuda', got {device!r}") from e
 
 
 def resolve_device(
-    device: str,
+    device: DeviceChoice,
     *,
     cuda_available: Callable[[], bool],
     cuda_missing: str = "",
 ) -> DeviceName:
     """``auto`` uses CUDA when ``cuda_available`` says so; explicit cuda requires it."""
-    choice = validate_device(device)
-    if choice == "cpu":
-        return "cpu"
+    if device == DeviceChoice.CPU:
+        return DeviceName.CPU
     if cuda_available():
-        return "cuda"
-    if choice == "auto":
-        return "cpu"
+        return DeviceName.CUDA
+    if device == DeviceChoice.AUTO:
+        return DeviceName.CPU
     detail = f" {cuda_missing}" if cuda_missing else ""
     raise RuntimeError(f"CUDA was requested, but no GPU runtime is available.{detail}")
 
@@ -66,6 +72,7 @@ def require_cuda_provider(providers: Sequence[str], *, component: str) -> None:
 def add_device_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--device",
-        choices=DEVICE_CHOICES,
+        type=DeviceChoice,
+        choices=list(DeviceChoice),
         help="override the configured device: auto (GPU when this app can use it), cpu, or cuda",
     )
