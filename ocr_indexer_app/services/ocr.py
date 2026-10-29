@@ -1,3 +1,4 @@
+import logging
 from importlib.metadata import version
 from pathlib import Path
 
@@ -13,6 +14,8 @@ from shared.device import (
     resolve_device,
 )
 from shared.search.text import normalize_text
+
+logger = logging.getLogger(__name__)
 
 OCR_ENGINE_TAG = f"rapidocr-{version('rapidocr')}/PP-OCRv5-mobile-det/eslav-PP-OCRv5-mobile-rec"
 
@@ -69,8 +72,11 @@ class MemeTextReader:
         })
         # RapidOCR loads (and on first run downloads) each model on its first use.
         blank = Image.new("RGB", (64, 64), "white")
+        logger.info("Loading OCR detection model")
         self._engine(blank, use_det=True, use_cls=False, use_rec=False)
+        logger.info("Loading OCR recognition model")
         self._engine(blank, use_det=False, use_cls=False, use_rec=True)
+        logger.info(f"OCR models loaded on {self.device}")
         if use_cuda:
             self._require_cuda()
 

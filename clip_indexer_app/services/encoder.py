@@ -46,9 +46,13 @@ class ClipImageEncoder:
         self._device = None
 
     def load(self) -> None:
+        logger.info("Building CLIP vision tower")
         model_cfg = open_clip.get_model_config(CLIP_MODEL_NAME)
         tower = _build_vision_tower(model_cfg["embed_dim"], model_cfg["vision_cfg"])
-        tower.load_state_dict(load_file(ensure_tower_weights(self._models_dir, ClipTower.VISUAL)))
+        weights = ensure_tower_weights(self._models_dir, ClipTower.VISUAL)
+        logger.info(f"Loading CLIP vision weights from {weights}")
+        tower.load_state_dict(load_file(weights))
+        logger.info(f"Moving CLIP vision tower to {self.device}")
         self._tower = tower.eval().to(self.device)
 
         preprocess_cfg = open_clip.get_pretrained_cfg(CLIP_MODEL_NAME, CLIP_PRETRAINED)

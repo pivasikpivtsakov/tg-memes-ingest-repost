@@ -29,20 +29,23 @@ class ClipTextEncoder:
             self._device_request,
             cuda_available=torch_cuda_available,
         ))
+        logger.info(f"Building CLIP text tower for {device}")
         model_cfg = open_clip.get_model_config(CLIP_MODEL_NAME)
         text_cfg = {**model_cfg["text_cfg"], "hf_model_pretrained": False}
         tower = _build_text_tower(model_cfg["embed_dim"], text_cfg)
+        weights = ensure_tower_weights(self._models_dir, ClipTower.TEXT)
+        logger.info(f"Loading CLIP text weights from {weights}")
         # The checkpoint carries a position_ids buffer that newer transformers no longer register.
-        missing, _ = tower.load_state_dict(
-            load_file(ensure_tower_weights(self._models_dir, ClipTower.TEXT)),
-            strict=False,
-        )
+        missing, _ = tower.load_state_dict(load_file(weights), strict=False)
         if missing:
             raise RuntimeError(f"CLIP text weights are missing keys: {missing}")
+        logger.info(f"Moving CLIP text tower to {device}")
         self._tower = tower.eval().to(device)
+        logger.info("Loading CLIP tokenizer")
         self._tokenizer = open_clip.get_tokenizer(CLIP_MODEL_NAME)
         self._device = device
         # The first call sets padding on the Rust tokenizer; concurrent first calls would race on it.
+        logger.info("Warming up CLIP text tower")
         self.encode("")
         logger.info(f"CLIP text tower loaded on {device}")
 
