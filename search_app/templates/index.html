@@ -2,76 +2,289 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#ffffff">
   <title>Поиск мемов</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js"
           integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg"
           crossorigin="anonymous"></script>
   <style>
+    * { box-sizing: border-box; }
+    html {
+      color-scheme: light;
+      background: var(--tg-theme-header-bg-color, var(--tg-theme-bg-color, #fff));
+    }
     body {
       margin: 0;
-      padding: calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px) + 12px)
-               12px
-               calc(var(--tg-safe-area-inset-bottom, 0px) + 12px);
-      font-family: system-ui, sans-serif;
-      background: var(--tg-theme-bg-color, #fff);
+      min-height: 100dvh;
+      font: 16px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--tg-theme-secondary-bg-color, #efeff4);
       color: var(--tg-theme-text-color, #000);
+      overflow-x: hidden;
     }
+    body.viewer-open { overflow: hidden; }
+    .dock-slot {
+      position: sticky;
+      top: 0;
+      z-index: 25;
+      padding: calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px) + 12px) 12px 12px;
+    }
+    .dock {
+      padding: 6px;
+      border-radius: 22px;
+      border: 1px solid color-mix(in srgb, var(--tg-theme-text-color, #000) 12%, transparent);
+      background: color-mix(in srgb, var(--tg-theme-header-bg-color, var(--tg-theme-bg-color, #fff)) 82%, transparent);
+      box-shadow: 0 10px 28px color-mix(in srgb, #000 18%, transparent);
+      -webkit-backdrop-filter: blur(18px) saturate(1.4);
+      backdrop-filter: blur(18px) saturate(1.4);
+    }
+    #status { margin: 4px 8px; overflow-wrap: anywhere; }
+    #status[hidden] { display: none; }
     #search { display: flex; gap: 8px; }
     #search[hidden] { display: none; }
     #search input {
       flex: 1;
       min-width: 0;
-      padding: 10px;
-      font-size: 16px;
-      border: 1px solid var(--tg-theme-hint-color, #999);
-      border-radius: 8px;
+      padding: 10px 12px;
+      font: inherit;
+      border: 0;
+      border-radius: 16px;
       background: var(--tg-theme-secondary-bg-color, #f0f0f0);
       color: inherit;
     }
-    #search button {
-      padding: 10px 16px;
-      font-size: 16px;
+    #search input::placeholder { color: var(--tg-theme-hint-color, #999); }
+    #search button, .download, .viewer-bar button {
+      flex: none;
+      padding: 10px 14px;
+      font: inherit;
       border: 0;
-      border-radius: 8px;
+      border-radius: 16px;
       background: var(--tg-theme-button-color, #2481cc);
       color: var(--tg-theme-button-text-color, #fff);
+      touch-action: manipulation;
     }
     #search button:disabled { opacity: 0.5; }
-    .hint, .timings { color: var(--tg-theme-hint-color, #999); font-size: 13px; }
-    .error { color: var(--tg-theme-destructive-text-color, #d00); }
-    .hits { list-style: none; padding: 0; margin: 0; }
-    .hit {
-      margin: 12px 0;
-      padding: 8px;
-      border-radius: 8px;
-      background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+    main {
+      padding: 0 12px calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px) + 16px);
+      min-width: 0;
     }
-    .hit img, .hit video { display: block; width: 100%; max-height: 60vh; object-fit: contain; }
-    .hit .meta { margin-top: 6px; font-size: 14px; }
-    .hit table { width: 100%; font-size: 13px; border-collapse: collapse; text-align: left; }
-    .hit th { color: var(--tg-theme-hint-color, #999); font-weight: normal; }
-    .hit .ocr { white-space: pre-line; font-size: 14px; margin: 6px 0 0; }
+    .hint, .timings { color: var(--tg-theme-hint-color, #8e8e93); font-size: 13px; }
+    .timings { margin: 0 4px 10px; }
+    .hits { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+    .card {
+      min-width: 0;
+      overflow: hidden;
+      border-radius: 18px;
+      background: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #fff));
+      box-shadow: 0 1px 2px color-mix(in srgb, #000 14%, transparent);
+      padding-bottom: 12px;
+    }
+    .empty, .error { margin: 0; padding: 14px; overflow-wrap: anywhere; }
+    .error { color: var(--tg-theme-destructive-text-color, #d00); }
+    .media {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      max-height: 70vh;
+      background: #111;
+      cursor: pointer;
+    }
+    .media img, .media video {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 70vh;
+      object-fit: contain;
+      pointer-events: none;
+    }
+    .media::after {
+      content: "На весь экран";
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, .55);
+      color: #fff;
+      font-size: 12px;
+      pointer-events: none;
+    }
+    .card-foot {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px 0;
+    }
+    .meta { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 14px; }
+    .scores {
+      width: 100%;
+      margin-top: 8px;
+      font-size: 13px;
+      border-collapse: collapse;
+      table-layout: fixed;
+      text-align: left;
+    }
+    .scores th, .scores td { padding: 2px 12px; overflow-wrap: anywhere; }
+    .scores th { color: var(--tg-theme-hint-color, #8e8e93); font-weight: normal; }
+    .ocr {
+      margin: 8px 12px 0;
+      white-space: pre-line;
+      overflow-wrap: anywhere;
+      font-size: 15px;
+    }
+    .empty { padding-bottom: 14px; }
+    #viewer {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding:
+        calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px) + 8px)
+        calc(var(--tg-safe-area-inset-right, 0px) + 12px)
+        calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px) + 12px)
+        calc(var(--tg-safe-area-inset-left, 0px) + 12px);
+      background: #000;
+      color: #fff;
+    }
+    #viewer[hidden] { display: none; }
+    .viewer-bar { display: flex; justify-content: space-between; gap: 8px; }
+    #viewer .viewer-bar button { background: rgba(255, 255, 255, .16); color: #fff; }
+    .viewer-stage {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .viewer-stage img, .viewer-stage video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .viewer-stage [hidden] { display: none !important; }
   </style>
 </head>
 <body>
-  <p id="status" class="hint">Вход…</p>
-  <form id="search" hidden
-        hx-post="api/search" hx-target="#results" hx-swap="innerHTML"
-        hx-disabled-elt="#search button">
-    <input name="query" type="search" required autocomplete="off" placeholder="Текст, шаблон или сцена">
-    <button type="submit">Найти</button>
-  </form>
-  <div id="results"></div>
+  <div class="dock-slot">
+    <header class="dock">
+      <p id="status" class="hint">Вход…</p>
+      <form id="search" hidden
+            hx-post="api/search" hx-target="#results" hx-swap="innerHTML"
+            hx-vals='{"limit": 30}'
+            hx-disabled-elt="#search button">
+        <input name="query" type="search" required autocomplete="off" enterkeyhint="search" placeholder="Текст, шаблон или сцена">
+        <button type="submit">Найти</button>
+      </form>
+    </header>
+  </div>
+  <main id="results"></main>
+  <div id="viewer" hidden>
+    <div class="viewer-bar">
+      <button type="button" id="viewer-close">Закрыть</button>
+      <button type="button" id="viewer-save">Скачать</button>
+    </div>
+    <div class="viewer-stage">
+      <img id="viewer-img" alt="" hidden>
+      <video id="viewer-video" controls playsinline webkit-playsinline hidden></video>
+    </div>
+  </div>
   <script>
     const fullScreenPlatforms = ['ios', 'android', 'android_x'];
     const tgWebApp = window.Telegram?.WebApp;
     const statusLine = document.getElementById('status');
     const form = document.getElementById('search');
+    const viewer = document.getElementById('viewer');
+    const viewerImg = document.getElementById('viewer-img');
+    const viewerVideo = document.getElementById('viewer-video');
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
     let token = null;
+    let viewerFile = null;
 
+    function themeColor(name, fallback) {
+      const value = tgWebApp?.themeParams?.[name];
+      return typeof value === 'string' && value ? value : fallback;
+    }
+
+    function syncChrome() {
+      const scheme = tgWebApp?.colorScheme === 'dark' ? 'dark' : 'light';
+      const header = themeColor('header_bg_color', themeColor('bg_color', scheme === 'dark' ? '#1c1c1d' : '#ffffff'));
+      const page = themeColor('secondary_bg_color', themeColor('bg_color', scheme === 'dark' ? '#0f0f0f' : '#efeff4'));
+      document.documentElement.style.colorScheme = scheme;
+      themeMeta.content = header;
+      tgWebApp?.setHeaderColor?.(header);
+      tgWebApp?.setBackgroundColor?.(page);
+      tgWebApp?.setBottomBarColor?.(themeColor('bottom_bar_bg_color', page));
+    }
+
+    function viewerChrome() {
+      document.documentElement.style.colorScheme = 'dark';
+      themeMeta.content = '#000000';
+      tgWebApp?.setHeaderColor?.('#000000');
+      tgWebApp?.setBackgroundColor?.('#000000');
+    }
+
+    function saveFile(url, name) {
+      const fileName = (name || '').trim() || 'meme';
+      if (typeof tgWebApp?.downloadFile === 'function') {
+        tgWebApp.downloadFile({ url, file_name: fileName });
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.click();
+    }
+
+    function openViewer(url, kind, name) {
+      viewerFile = { url, name };
+      if (kind === 'video') {
+        viewerImg.hidden = true;
+        viewerImg.removeAttribute('src');
+        viewerVideo.hidden = false;
+        viewerVideo.src = url;
+        viewerVideo.play().catch(() => {});
+      } else {
+        viewerVideo.pause();
+        viewerVideo.removeAttribute('src');
+        viewerVideo.load();
+        viewerVideo.hidden = true;
+        viewerImg.hidden = false;
+        viewerImg.src = url;
+      }
+      viewer.hidden = false;
+      document.body.classList.add('viewer-open');
+      viewerChrome();
+      tgWebApp?.BackButton?.show();
+    }
+
+    function closeViewer() {
+      if (viewer.hidden) return;
+      viewer.hidden = true;
+      viewerFile = null;
+      viewerImg.removeAttribute('src');
+      viewerImg.hidden = true;
+      viewerVideo.pause();
+      viewerVideo.removeAttribute('src');
+      viewerVideo.load();
+      viewerVideo.hidden = true;
+      document.body.classList.remove('viewer-open');
+      tgWebApp?.BackButton?.hide();
+      syncChrome();
+    }
+
+    syncChrome();
     if (tgWebApp) {
+      tgWebApp.onEvent?.('themeChanged', () => {
+        if (viewer.hidden) syncChrome();
+      });
       tgWebApp.disableVerticalSwipes?.();
       tgWebApp.expand();
       try {
@@ -81,6 +294,7 @@
       } catch {
         // requestFullscreen not supported (Bot API < 8.0)
       }
+      tgWebApp.BackButton?.onClick(closeViewer);
       tgWebApp.ready();
     }
 
@@ -90,16 +304,18 @@
     }
 
     async function authenticate() {
-      const initData = tgWebApp?.initData;
-      if (!initData) {
-        showAuthError('Откройте приложение из Telegram');
-        return;
-      }
+      const initData = tgWebApp?.initData ?? '';
       try {
         const response = await fetch('api/auth/telegram?' + new URLSearchParams({ init_data: initData }));
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
-          showAuthError(typeof body.detail === 'string' ? body.detail : `Ошибка входа: ${response.status}`);
+          const detail = typeof body.detail === 'string' ? body.detail : '';
+          const outsideTelegram = !initData && detail === 'Missing init_data';
+          showAuthError(
+            outsideTelegram
+              ? 'Откройте приложение из Telegram'
+              : (detail || `Ошибка входа: ${response.status}`),
+          );
           return;
         }
         token = body.token;
@@ -110,16 +326,46 @@
       }
     }
 
-    document.body.addEventListener('htmx:configRequest', (event) => {
-      if (token) {
-        event.detail.headers['Authorization'] = `Bearer ${token}`;
+    document.body.addEventListener('click', (event) => {
+      const download = event.target.closest('[data-download]');
+      if (download) {
+        event.stopPropagation();
+        saveFile(download.dataset.download, download.dataset.name);
+        return;
       }
+      const opener = event.target.closest('[data-open]');
+      if (opener) openViewer(opener.dataset.open, opener.dataset.kind, opener.dataset.name);
+    });
+    document.body.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeViewer();
+        return;
+      }
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const opener = event.target.closest?.('[data-open]');
+      if (!opener) return;
+      event.preventDefault();
+      openViewer(opener.dataset.open, opener.dataset.kind, opener.dataset.name);
+    });
+    document.getElementById('viewer-close').addEventListener('click', closeViewer);
+    document.getElementById('viewer-save').addEventListener('click', () => {
+      if (viewerFile) saveFile(viewerFile.url, viewerFile.name);
+    });
+    viewer.addEventListener('click', (event) => {
+      if (event.target === viewer || event.target.classList.contains('viewer-stage')) closeViewer();
+    });
+
+    document.body.addEventListener('htmx:configRequest', (event) => {
+      if (token) event.detail.headers['Authorization'] = `Bearer ${token}`;
     });
     document.body.addEventListener('htmx:beforeSwap', (event) => {
       if (event.detail.xhr.status === 401) {
         event.detail.shouldSwap = true;
         event.detail.isError = false;
       }
+    });
+    document.body.addEventListener('htmx:afterSwap', (event) => {
+      if (event.detail.target.id === 'results') window.scrollTo(0, 0);
     });
 
     authenticate();

@@ -1,9 +1,12 @@
 import asyncio
+import logging
 
 from search_app.config import SearchAppConfig
 from search_app.services import TelegramAuthService, TokensService, UsersService
 from shared.db.session import AsyncDatabaseManager
 from shared.search.service import SearchService
+
+logger = logging.getLogger(__name__)
 
 
 class Store:
@@ -15,7 +18,14 @@ class Store:
             models_dir=config.models_dir,
             device=config.search_device,
         )
-        self.telegram_auth = TelegramAuthService(bot_token=config.search_bot_token)
+        self.telegram_auth = TelegramAuthService(
+            bot_token=config.search_bot_token,
+            mock_init_data=config.mock_init_data,
+        )
+        if config.mock_init_data:
+            logger.warning(
+                "mock_init_data is set; every login uses that user and skips the hash check"
+            )
         self.tokens = TokensService(
             secret=config.search_jwt_secret,
             expiration=config.search_jwt_expiration,

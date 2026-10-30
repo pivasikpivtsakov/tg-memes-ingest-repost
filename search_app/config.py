@@ -12,6 +12,12 @@ class SearchAppConfig(BaseConfig):
         self._search_host = self._config_data.get('search_host', '127.0.0.1')
         self._search_port = self._config_data.get('search_port', 8080)
         self._search_jwt_expiration_hours = self._config_data.get('search_jwt_expiration_hours', 168)
+        # Leave unset in production: a value signs every visitor in as that user.
+        raw_mock_init_data = self._config_data.get('mock_init_data')
+        if isinstance(raw_mock_init_data, str):
+            self._mock_init_data = raw_mock_init_data.strip() or None
+        else:
+            self._mock_init_data = None
 
     @property
     def search_device(self) -> DeviceChoice:
@@ -37,6 +43,10 @@ class SearchAppConfig(BaseConfig):
     @property
     def search_jwt_expiration(self) -> timedelta:
         return timedelta(hours=float(self._search_jwt_expiration_hours))
+
+    @property
+    def mock_init_data(self) -> str | None:
+        return self._mock_init_data
 
     @property
     def minio_public_base_url(self) -> str:

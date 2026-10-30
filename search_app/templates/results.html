@@ -7,23 +7,33 @@
   · hydrate {{ "%.2f"|format(timings.hydrate) }}
 </p>
 {% if not hits %}
-<p>Ничего не найдено</p>
+<p class="card empty">Ничего не найдено</p>
 {% else %}
 <ol class="hits">
   {% for hit in hits %}
   {% set url = media_base_url ~ "/" ~ hit.media.file_path %}
-  <li class="hit">
-    {% if hit.media.media_type == MediaType.VIDEO %}
-    <video src="{{ url }}" controls playsinline webkit-playsinline preload="metadata"></video>
-    {% else %}
-    <img src="{{ url }}" alt="" loading="lazy">
-    {% endif %}
-    <div class="meta">
-      {{ loop.index }}. #{{ hit.media.id }} · {{ hit.media.media_type }}
-      {% if hit.exact %}· <b>exact</b>{% endif %}
-      · rrf {{ "%.4f"|format(hit.score) }}
+  {% set name = hit.media.file_path.split('/')[-1] %}
+  {% set kind = 'video' if hit.media.media_type == MediaType.VIDEO else 'image' %}
+  <li class="card">
+    <div class="media" role="button" tabindex="0" aria-label="Открыть"
+         data-open="{{ url }}" data-kind="{{ kind }}" data-name="{{ name }}">
+      {% if kind == 'video' %}
+      <video src="{{ url }}" muted playsinline webkit-playsinline preload="metadata"
+             {% if hit.media.width and hit.media.height %}width="{{ hit.media.width }}" height="{{ hit.media.height }}"{% endif %}></video>
+      {% else %}
+      <img src="{{ url }}" alt="" loading="lazy" decoding="async"
+           {% if hit.media.width and hit.media.height %}width="{{ hit.media.width }}" height="{{ hit.media.height }}"{% endif %}>
+      {% endif %}
     </div>
-    <table>
+    <div class="card-foot">
+      <p class="meta">
+        {{ loop.index }}. #{{ hit.media.id }} · {{ hit.media.media_type }}
+        {% if hit.exact %}· <b>exact</b>{% endif %}
+        · rrf {{ "%.4f"|format(hit.score) }}
+      </p>
+      <button type="button" class="download" data-download="{{ url }}" data-name="{{ name }}">Скачать</button>
+    </div>
+    <table class="scores">
       <tr>{% for channel in Channel %}<th>{{ channel }}</th>{% endfor %}</tr>
       <tr>
         {% for channel in Channel %}
