@@ -52,7 +52,7 @@ class _StageClock:
 
 
 class SearchService:
-    """Exact phrase matches first, then Reciprocal Rank Fusion of trigram and CLIP results."""
+    """Phrase queries keep exact OCR hits first. Fusion weights OCR above CLIP."""
 
     def __init__(
         self,

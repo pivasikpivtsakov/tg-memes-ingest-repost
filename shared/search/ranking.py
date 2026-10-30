@@ -16,15 +16,11 @@ _RRF_K = 60
 
 # Longer queries are usually a remembered phrase; one or two words more often name a template or scene.
 _PHRASE_MIN_WORDS = 3
-_PHRASE_WEIGHTS: dict[Channel, float] = {
+# Same rank: OCR beats CLIP. CLIP at rank 1 passes an OCR hit only after about the 16th place.
+_WEIGHTS: dict[Channel, float] = {
     Channel.EXACT: 1.0,
     Channel.TRGM: 1.0,
-    Channel.CLIP: 0.5,
-}
-_SHORT_WEIGHTS: dict[Channel, float] = {
-    Channel.EXACT: 1.0,
-    Channel.TRGM: 0.6,
-    Channel.CLIP: 1.0,
+    Channel.CLIP: 0.8,
 }
 
 
@@ -49,7 +45,7 @@ def fuse(
     query_norm: str,
     limit: int,
 ) -> list[FusedHit]:
-    """Reciprocal Rank Fusion. Exact hits sort ahead of the fused score."""
+    """Reciprocal Rank Fusion. On a phrase, exact hits sort ahead of the fused score."""
     grouped: dict[int, dict[Channel, ChannelMatch]] = defaultdict(dict)
     ranked: dict[Channel, list[tuple[int, float]]] = {
         Channel.EXACT: exact,
@@ -60,14 +56,14 @@ def fuse(
         for rank, (media_id, score) in enumerate(matches, start=1):
             grouped[media_id][channel] = ChannelMatch(rank=rank, score=score)
 
-    weights = _PHRASE_WEIGHTS if len(query_norm.split()) >= _PHRASE_MIN_WORDS else _SHORT_WEIGHTS
+    phrase = len(query_norm.split()) >= _PHRASE_MIN_WORDS
     scored = {
-        media_id: sum(weights[channel] / (_RRF_K + match.rank) for channel, match in matches.items())
+        media_id: sum(_WEIGHTS[channel] / (_RRF_K + match.rank) for channel, match in matches.items())
         for media_id, matches in grouped.items()
     }
     chosen = sorted(
         scored,
-        key=lambda media_id: (Channel.EXACT in grouped[media_id], scored[media_id]),
+        key=lambda media_id: (phrase and Channel.EXACT in grouped[media_id], scored[media_id]),
         reverse=True,
     )[:limit]
     return [
