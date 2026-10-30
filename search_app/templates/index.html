@@ -229,18 +229,30 @@
       tgWebApp?.setBackgroundColor?.('#000000');
     }
 
+    function attachmentUrl(url, fileName) {
+      const safeName = fileName.replace(/["\\]/g, '');
+      const value = `attachment; filename="${safeName}"`;
+      const sep = url.includes('?') ? '&' : '?';
+      // Telegram saves the file only when the response says it is an attachment.
+      return `${url}${sep}response-content-disposition=${encodeURIComponent(value)}`;
+    }
+
     function saveFile(url, name) {
       const fileName = (name || '').trim() || 'meme';
-      if (typeof tgWebApp?.downloadFile === 'function') {
-        tgWebApp.downloadFile({ url, file_name: fileName });
+      const href = attachmentUrl(url, fileName);
+      try {
+        if (typeof tgWebApp?.downloadFile === 'function' && tgWebApp.isVersionAtLeast?.('8.0')) {
+          tgWebApp.downloadFile({ url: href, file_name: fileName });
+          return;
+        }
+      } catch {
+        // client older than Bot API 8.0, or a download popup is already open
+      }
+      if (typeof tgWebApp?.openLink === 'function') {
+        tgWebApp.openLink(href);
         return;
       }
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.click();
+      location.assign(href);
     }
 
     function openViewer(url, kind, name) {
