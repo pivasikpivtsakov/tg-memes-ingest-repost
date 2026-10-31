@@ -15,11 +15,13 @@
   {% set name = hit.media.file_path.split('/')[-1] %}
   {% set kind = 'video' if hit.media.media_type == MediaType.VIDEO else 'image' %}
   <li class="card">
-    <div class="media" role="button" tabindex="0" aria-label="Открыть"
+    <div class="media" role="button" tabindex="0"
+         aria-label="{% if kind == 'video' %}Открыть видео{% else %}Открыть{% endif %}"
          data-open="{{ url }}" data-kind="{{ kind }}" data-name="{{ name }}">
       {% if kind == 'video' %}
       <video src="{{ url }}" muted playsinline webkit-playsinline preload="metadata"
              {% if hit.media.width and hit.media.height %}width="{{ hit.media.width }}" height="{{ hit.media.height }}"{% endif %}></video>
+      <span class="play" aria-hidden="true"></span>
       {% else %}
       <img src="{{ url }}" alt="" loading="lazy" decoding="async"
            {% if hit.media.width and hit.media.height %}width="{{ hit.media.width }}" height="{{ hit.media.height }}"{% endif %}>
@@ -31,6 +33,10 @@
         {% if hit.exact %}· <b>exact</b>{% endif %}
         · rrf {{ "%.4f"|format(hit.score) }}
       </p>
+      {% if hit.media.posted_message_id %}
+      <button type="button" class="channel"
+              data-channel="https://t.me/memesfornormalpeople/{{ hit.media.posted_message_id }}">В паблик</button>
+      {% endif %}
       <button type="button" class="download" data-download="{{ url }}" data-name="{{ name }}">Скачать</button>
     </div>
     <table class="scores">

@@ -50,11 +50,12 @@
       font: inherit;
       border: 0;
       border-radius: 16px;
-      background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+      /* Android header pills are a 22% black scrim with white icons. A text field stays lighter. */
+      background: color-mix(in srgb, var(--tg-theme-text-color, #000) 4%, var(--tg-theme-header-bg-color, #fff));
       color: inherit;
     }
     #search input::placeholder { color: var(--tg-theme-hint-color, #999); }
-    #search button, .download, .viewer-bar button {
+    #search button, .download, .channel, .viewer-bar button {
       flex: none;
       padding: 10px 14px;
       font: inherit;
@@ -63,6 +64,15 @@
       background: var(--tg-theme-button-color, #2481cc);
       color: var(--tg-theme-button-text-color, #fff);
       touch-action: manipulation;
+    }
+    .channel {
+      background: color-mix(in srgb, var(--tg-theme-button-color, #2481cc) 14%, transparent);
+      color: var(--tg-theme-link-color, var(--tg-theme-button-color, #2481cc));
+    }
+    #search button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
     #search button:disabled { opacity: 0.5; }
     main {
@@ -111,6 +121,48 @@
       font-size: 12px;
       pointer-events: none;
     }
+    .play {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 58px;
+      height: 58px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: rgba(0, 0, 0, .45);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .35);
+      pointer-events: none;
+    }
+    .play::before {
+      content: "";
+      position: absolute;
+      left: 23px;
+      top: 19px;
+      border-style: solid;
+      border-width: 10px 0 10px 17px;
+      border-color: transparent transparent transparent #fff;
+    }
+    .pending {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 8px 2px;
+      color: var(--tg-theme-text-color, #000);
+      font-size: 14px;
+    }
+    .pending.htmx-request { display: flex; }
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex: none;
+    }
+    #search .spinner, .pending .spinner { display: none; }
+    #search.htmx-request .spinner, .pending.htmx-request .spinner { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .card-foot {
       display: flex;
       flex-wrap: wrap;
@@ -177,10 +229,12 @@
       <form id="search" hidden
             hx-post="api/search" hx-target="#results" hx-swap="innerHTML"
             hx-vals='{"limit": 30}'
+            hx-indicator="#pending, #search"
             hx-disabled-elt="#search button">
         <input name="query" type="search" required autocomplete="off" enterkeyhint="search" placeholder="Текст, шаблон или сцена">
-        <button type="submit">Найти</button>
+        <button type="submit"><span class="spinner" aria-hidden="true"></span>Найти</button>
       </form>
+      <p id="pending" class="pending" role="status"><span class="spinner" aria-hidden="true"></span>Ищем…</p>
     </header>
   </div>
   <main id="results"></main>
@@ -235,6 +289,14 @@
       const sep = url.includes('?') ? '&' : '?';
       // Telegram saves the file only when the response says it is an attachment.
       return `${url}${sep}response-content-disposition=${encodeURIComponent(value)}`;
+    }
+
+    function openPublic(url) {
+      if (typeof tgWebApp?.openTelegramLink === 'function') {
+        tgWebApp.openTelegramLink(url);
+        return;
+      }
+      location.assign(url);
     }
 
     function saveFile(url, name) {
@@ -339,6 +401,12 @@
     }
 
     document.body.addEventListener('click', (event) => {
+      const channel = event.target.closest('[data-channel]');
+      if (channel) {
+        event.stopPropagation();
+        openPublic(channel.dataset.channel);
+        return;
+      }
       const download = event.target.closest('[data-download]');
       if (download) {
         event.stopPropagation();

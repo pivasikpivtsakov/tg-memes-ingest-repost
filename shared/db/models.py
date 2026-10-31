@@ -157,6 +157,11 @@ class Media(Base):
         nullable=True,
         comment="When media was marked sent to Telegram target channel"
     )
+    posted_message_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+        comment="Message id in the target channel; NULL until that post is sent",
+    )
 
     is_sent_tiktok: Mapped[bool] = mapped_column(
         Boolean, 

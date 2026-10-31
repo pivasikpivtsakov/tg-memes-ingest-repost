@@ -140,18 +140,33 @@ class MediaService:
             order_direction=order_direction,
         )
 
-    async def mark_media_as_sent(self, media_id: int) -> bool:
-        updated = await self._media.mark_as_sent(media_id)
+    async def mark_media_as_sent(
+        self,
+        media_id: int,
+        *,
+        posted_message_id: int | None = None,
+    ) -> bool:
+        updated = await self._media.mark_as_sent(
+            media_id,
+            posted_message_id=posted_message_id,
+        )
         if updated:
             logger.info(f"Media #{media_id} marked as sent")
         else:
             logger.warning(f"Media #{media_id} not found")
         return updated
 
-    async def mark_medias_as_sent(self, media_ids: list[int]) -> int:
+    async def mark_medias_as_sent(
+        self,
+        media_ids: list[int],
+        posted_message_ids: dict[int, int] | None = None,
+    ) -> int:
         if not media_ids:
             return 0
-        updated = await self._media.mark_many_as_sent(media_ids)
+        updated = await self._media.mark_many_as_sent(
+            media_ids,
+            posted_message_ids=posted_message_ids,
+        )
         if updated:
             logger.info(f"Media {media_ids} marked as sent")
         else:

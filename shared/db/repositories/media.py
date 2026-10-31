@@ -33,6 +33,7 @@ class MediaMetadata(BaseModel):
     downloaded_at: datetime
     created_at: datetime
     posted_at_tg: datetime | None = None
+    posted_message_id: int | None = None
     posted_at_tiktok: datetime | None = None
 
     class Config:
@@ -131,22 +132,34 @@ class MediaRepository(PostgresRepository):
                 return None
             return self._to_metadata(media)
 
-    async def mark_as_sent(self, media_id: int) -> bool:
+    async def mark_as_sent(self, media_id: int, *, posted_message_id: int | None = None) -> bool:
+        values: dict[str, object] = {
+            Media.is_sent_tg.key: True,
+            Media.posted_at_tg.key: func.current_timestamp(),
+        }
+        if posted_message_id is not None:
+            values[Media.posted_message_id.key] = posted_message_id
         async with self._session() as session:
-            stmt = (
-                update(Media)
-                .where(Media.id == media_id)
-                .values({
-                    Media.is_sent_tg.key: True,
-                    Media.posted_at_tg.key: func.current_timestamp(),
-                })
-            )
+            stmt = update(Media).where(Media.id == media_id).values(values)
             result = await session.execute(stmt)
             return result.rowcount > 0
 
-    async def mark_many_as_sent(self, media_ids: list[int]) -> int:
+    async def mark_many_as_sent(
+        self,
+        media_ids: list[int],
+        posted_message_ids: dict[int, int] | None = None,
+    ) -> int:
         if not media_ids:
             return 0
+        if posted_message_ids is not None:
+            updated = 0
+            for media_id in media_ids:
+                if await self.mark_as_sent(
+                    media_id,
+                    posted_message_id=posted_message_ids.get(media_id),
+                ):
+                    updated += 1
+            return updated
         async with self._session() as session:
             stmt = (
                 update(Media)

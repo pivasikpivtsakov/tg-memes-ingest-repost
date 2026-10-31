@@ -185,7 +185,10 @@ class MemesSender:
 
             message: Message = await self.client.send_file(**kwargs)
 
-            await self.media_service.mark_media_as_sent(media.id)
+            await self.media_service.mark_media_as_sent(
+                media.id,
+                posted_message_id=message.id,
+            )
             
             logger.info(
                 f"✓ Successfully sent {media_type} #{media.id} "
@@ -252,13 +255,27 @@ class MemesSender:
         )
 
         try:
-            await self.client.send_file(
+            sent = await self.client.send_file(
                 entity=self._resolved_entity,
                 file=file_buffers,
                 force_document=False,
                 supports_streaming=True,
             )
-            await self.media_service.mark_medias_as_sent(attempt_ids)
+            messages: list[Message] = sent if isinstance(sent, list) else [sent]
+            if len(messages) != len(attempt_ids):
+                logger.warning(
+                    "Album send returned %s messages for %s files (%s)",
+                    len(messages),
+                    len(attempt_ids),
+                    ids_preview,
+                )
+            await self.media_service.mark_medias_as_sent(
+                attempt_ids,
+                posted_message_ids={
+                    media_id: message.id
+                    for media_id, message in zip(attempt_ids, messages, strict=False)
+                },
+            )
             logger.info(
                 f"✓ Successfully sent album ({ids_preview}) to {self.target_chat_id}"
             )
