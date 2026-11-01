@@ -21,11 +21,12 @@
       {% if kind == 'video' %}
       <video src="{{ url }}" muted playsinline webkit-playsinline preload="metadata"
              {% if hit.media.width and hit.media.height %}width="{{ hit.media.width }}" height="{{ hit.media.height }}"{% endif %}></video>
-      <span class="play" aria-hidden="true"></span>
+      <span class="play" aria-hidden="true"><svg class="icon"><use href="#i-play"/></svg></span>
       {% else %}
       <img src="{{ url }}" alt="" loading="lazy" decoding="async"
            {% if hit.media.width and hit.media.height %}width="{{ hit.media.width }}" height="{{ hit.media.height }}"{% endif %}>
       {% endif %}
+      <span class="expand" aria-hidden="true"><svg class="icon"><use href="#i-maximize"/></svg></span>
     </div>
     <div class="card-foot">
       <p class="meta">
@@ -33,11 +34,19 @@
         {% if hit.exact %}· <b>exact</b>{% endif %}
         · rrf {{ "%.4f"|format(hit.score) }}
       </p>
-      {% if hit.media.posted_message_id %}
-      <button type="button" class="channel"
-              data-channel="https://t.me/memesfornormalpeople/{{ hit.media.posted_message_id }}">В паблик</button>
-      {% endif %}
-      <button type="button" class="download" data-download="{{ url }}" data-name="{{ name }}">Скачать</button>
+      <div class="card-actions">
+        {% if hit.media.posted_message_id %}
+        <button type="button" class="channel"
+                data-channel="https://t.me/memesfornormalpeople/{{ hit.media.posted_message_id }}">
+          <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>
+          В паблик
+        </button>
+        {% endif %}
+        <button type="button" class="download icon-btn" aria-label="Скачать"
+                data-download="{{ url }}" data-name="{{ name }}">
+          <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+        </button>
+      </div>
     </div>
     <table class="scores">
       <tr>{% for channel in Channel %}<th>{{ channel }}</th>{% endfor %}</tr>

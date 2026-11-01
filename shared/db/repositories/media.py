@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -232,3 +233,24 @@ class MediaRepository(PostgresRepository):
                 )
             )
             return [self._to_metadata(media) for media in result.scalars().all()]
+
+    async def list_posted_tg(self) -> list[MediaMetadata]:
+        async with self._session() as session:
+            result = await session.execute(
+                select(Media)
+                .where(Media.posted_at_tg.is_not(None))
+                .order_by(Media.posted_at_tg.asc(), Media.album_position.asc(), Media.id.asc())
+            )
+            return [self._to_metadata(media) for media in result.scalars().all()]
+
+    async def set_posted_message_ids(self, posted_message_ids: Mapping[int, int]) -> None:
+        if not posted_message_ids:
+            return
+        async with self._session() as session:
+            await session.execute(
+                update(Media),
+                [
+                    {Media.id.key: media_id, Media.posted_message_id.key: message_id}
+                    for media_id, message_id in posted_message_ids.items()
+                ],
+            )
