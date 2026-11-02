@@ -36,4 +36,5 @@ class Store:
         await asyncio.to_thread(self.search.load)
 
     async def disconnect(self) -> None:
+        self.search.close()
         await self.db.dispose()

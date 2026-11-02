@@ -51,6 +51,7 @@ async def main(query: str, limit: int, explain: bool) -> None:
         service.load()
         hits, timings = await service.search(query, limit=limit)
     finally:
+        service.close()
         await db.dispose()
 
     if not hits:

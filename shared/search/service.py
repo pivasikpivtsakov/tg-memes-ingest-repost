@@ -72,6 +72,9 @@ class SearchService:
     def load(self) -> None:
         self._clip.load()
 
+    def close(self) -> None:
+        self._clip.close()
+
     async def search(
         self,
         query: str,

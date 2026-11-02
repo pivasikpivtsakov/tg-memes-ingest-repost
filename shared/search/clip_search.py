@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -24,12 +25,18 @@ class ClipSearch:
     ) -> None:
         self._embeddings = embeddings
         self._encoder = ClipTextEncoder(models_dir=models_dir, device=device)
+        # Parallel forward passes fight over the GIL and share one CUDA stream: two threads are slower than one.
+        self._encode_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="clip-text")
 
     def load(self) -> None:
         self._encoder.load()
 
+    def close(self) -> None:
+        self._encode_executor.shutdown()
+
     async def encode(self, query: str) -> np.ndarray:
-        return await asyncio.to_thread(self._encoder.encode, query.strip())
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._encode_executor, self._encoder.encode, query.strip())
 
     async def nearest(self, embedding: np.ndarray) -> list[tuple[int, float]]:
         matches = await self._embeddings.nearest(
