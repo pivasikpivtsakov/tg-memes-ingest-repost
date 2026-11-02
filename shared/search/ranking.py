@@ -10,7 +10,8 @@ class Channel(StrEnum):
 
 
 # Each channel returns this many candidates; fusion only reorders them.
-CANDIDATE_LIMIT = 50
+# The mini app pages through one fused window of this length, 20 at a time.
+CANDIDATE_LIMIT = 100
 
 _RRF_K = 60
 

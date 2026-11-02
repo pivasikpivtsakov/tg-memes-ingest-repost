@@ -1,64 +1,48 @@
-<p class="timings">
-  {{ "%.2f"|format(timings.total) }} с
-  · exact {{ "%.2f"|format(timings.exact) }}
-  · trgm {{ "%.2f"|format(timings.trigram) }}
-  · encode {{ "%.2f"|format(timings.encode) }}
-  · clip {{ "%.2f"|format(timings.clip) }}
-  · hydrate {{ "%.2f"|format(timings.hydrate) }}
-</p>
-{% if not hits %}
-<p class="card empty">Ничего не найдено</p>
+{% macro tile(hit, position) -%}
+{% set url = media_base_url ~ "/" ~ hit.media.file_path %}
+{% set name = hit.media.file_path.split('/')[-1] %}
+{% set kind = 'video' if hit.media.media_type == MediaType.VIDEO else 'image' %}
+<button type="button" class="tile"
+        data-open="{{ url }}" data-kind="{{ kind }}" data-name="{{ name }}"
+        data-meta="{{ position }}. #{{ hit.media.id }} · {{ hit.media.media_type }}{% if hit.exact %} · exact{% endif %} · rrf {{ '%.4f'|format(hit.score) }}"
+        data-ranks="{{ rank_line(hit) }}"
+        data-ocr="{{ hit.text or '' }}"
+        {% if hit.media.posted_message_id %}data-public="https://t.me/memesfornormalpeople/{{ hit.media.posted_message_id }}"{% endif %}
+        aria-label="{% if kind == 'video' %}Открыть видео{% else %}Открыть{% endif %}">
+  {% if kind == 'video' %}
+  <video src="{{ url }}" muted playsinline webkit-playsinline preload="metadata" draggable="false"
+         {% if hit.media.width and hit.media.height %}width="{{ hit.media.width }}" height="{{ hit.media.height }}"{% endif %}></video>
+  <span class="play" aria-hidden="true"><svg class="icon"><use href="#i-play"/></svg></span>
+  {% else %}
+  <img src="{{ url }}" alt="" draggable="false" decoding="async"
+       loading="{{ 'eager' if position <= 4 else 'lazy' }}"
+       {% if hit.media.width and hit.media.height %}width="{{ hit.media.width }}" height="{{ hit.media.height }}"{% endif %}>
+  {% endif %}
+</button>
+{%- endmacro %}
+{% if offset == 0 %}
+<p class="timings">{{ "%.2f"|format(timings.total) }} с</p>
+{% if hits %}
+<div id="hits" data-query="{{ query }}">
+{% for hit in hits %}
+{{ tile(hit, offset + loop.index) }}
+{% endfor %}
+</div>
 {% else %}
-<ol class="hits">
-  {% for hit in hits %}
-  {% set url = media_base_url ~ "/" ~ hit.media.file_path %}
-  {% set name = hit.media.file_path.split('/')[-1] %}
-  {% set kind = 'video' if hit.media.media_type == MediaType.VIDEO else 'image' %}
-  <li class="card">
-    <div class="media" role="button" tabindex="0"
-         aria-label="{% if kind == 'video' %}Открыть видео{% else %}Открыть{% endif %}"
-         data-open="{{ url }}" data-kind="{{ kind }}" data-name="{{ name }}">
-      {% if kind == 'video' %}
-      <video src="{{ url }}" muted playsinline webkit-playsinline preload="metadata"
-             {% if hit.media.width and hit.media.height %}width="{{ hit.media.width }}" height="{{ hit.media.height }}"{% endif %}></video>
-      <span class="play" aria-hidden="true"><svg class="icon"><use href="#i-play"/></svg></span>
-      {% else %}
-      <img src="{{ url }}" alt="" loading="lazy" decoding="async"
-           {% if hit.media.width and hit.media.height %}width="{{ hit.media.width }}" height="{{ hit.media.height }}"{% endif %}>
-      {% endif %}
-      <span class="expand" aria-hidden="true"><svg class="icon"><use href="#i-maximize"/></svg></span>
-    </div>
-    <div class="card-foot">
-      <p class="meta">
-        {{ loop.index }}. #{{ hit.media.id }} · {{ hit.media.media_type }}
-        {% if hit.exact %}· <b>exact</b>{% endif %}
-        · rrf {{ "%.4f"|format(hit.score) }}
-      </p>
-      <div class="card-actions">
-        {% if hit.media.posted_message_id %}
-        <button type="button" class="channel"
-                data-channel="https://t.me/memesfornormalpeople/{{ hit.media.posted_message_id }}">
-          <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>
-          В паблик
-        </button>
-        {% endif %}
-        <button type="button" class="download icon-btn" aria-label="Скачать"
-                data-download="{{ url }}" data-name="{{ name }}">
-          <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
-        </button>
-      </div>
-    </div>
-    <table class="scores">
-      <tr>{% for channel in Channel %}<th>{{ channel }}</th>{% endfor %}</tr>
-      <tr>
-        {% for channel in Channel %}
-        {% set match = hit.channels.get(channel) %}
-        <td>{% if match %}#{{ match.rank }} ({{ "%.2f"|format(match.score) }}){% endif %}</td>
-        {% endfor %}
-      </tr>
-    </table>
-    {% if hit.text %}<p class="ocr">{{ hit.text }}</p>{% endif %}
-  </li>
-  {% endfor %}
-</ol>
+<p class="empty">Ничего не найдено</p>
+{% endif %}
+{% else %}
+{% for hit in hits %}
+{{ tile(hit, offset + loop.index) }}
+{% endfor %}
+{% endif %}
+{% if has_more %}
+<form id="more" class="more" method="post" action="api/search"
+      hx-post="api/search" hx-trigger="loadmore" hx-swap="outerHTML" hx-sync="#more:drop"
+      hx-indicator="this" aria-label="Загружаем ещё">
+  <input type="hidden" name="query" value="{{ query }}">
+  <input type="hidden" name="limit" value="{{ page_size }}">
+  <input type="hidden" name="offset" value="{{ offset + hits|length }}">
+  <svg class="icon spinner" aria-hidden="true"><use href="#i-loader"/></svg>
+</form>
 {% endif %}

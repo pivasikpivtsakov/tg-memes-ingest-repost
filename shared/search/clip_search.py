@@ -9,8 +9,9 @@ from shared.device import DeviceChoice
 from shared.search.clip_text import ClipTextEncoder
 from shared.search.ranking import CANDIDATE_LIMIT
 
-# HNSW returns at most ef_search rows, so this stays above the candidate limit.
-_HNSW_EF_SEARCH = 100
+# HNSW returns at most ef_search rows. Twice the candidate limit, same ratio as the old 100/50 pair,
+# otherwise the tail of the window is whatever the index walked first.
+_HNSW_EF_SEARCH = 200
 
 
 class ClipSearch:

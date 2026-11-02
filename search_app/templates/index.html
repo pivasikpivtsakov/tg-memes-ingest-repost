@@ -11,6 +11,14 @@
           crossorigin="anonymous"></script>
   <style>
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    :root {
+      /* Telegram Android draws fullscreen controls at insets + 8dp (BotFullscreenButtons). */
+      --edge: 8px;
+      --fade: 22px;
+      --page-left: calc(var(--tg-safe-area-inset-left, 0px) + var(--tg-content-safe-area-inset-left, 0px) + var(--edge));
+      --page-right: calc(var(--tg-safe-area-inset-right, 0px) + var(--tg-content-safe-area-inset-right, 0px) + var(--edge));
+    }
     html {
       color-scheme: light;
       background: var(--tg-theme-header-bg-color, var(--tg-theme-bg-color, #fff));
@@ -21,28 +29,61 @@
       font: 16px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif;
       background: var(--tg-theme-secondary-bg-color, #efeff4);
       color: var(--tg-theme-text-color, #000);
-      overflow-x: hidden;
+      overflow-x: clip;
     }
-    body.viewer-open { overflow: hidden; }
+    /* CSS has no per-pixel blur radius (Apple uses one GPU shader). These are compositor
+       backdrop-filter layers: stronger blur only covers the top, so it fades out. */
+    .veil {
+      position: fixed;
+      z-index: 20;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--veil-h, 120px);
+      pointer-events: none;
+    }
+    .veil > div { position: absolute; inset: 0; }
+    .veil > div:not(.veil-tint) {
+      -webkit-backdrop-filter: blur(var(--b)) saturate(1.15);
+      backdrop-filter: blur(var(--b)) saturate(1.15);
+      -webkit-mask-image: linear-gradient(to bottom, #000 var(--a), transparent var(--z));
+      mask-image: linear-gradient(to bottom, #000 var(--a), transparent var(--z));
+    }
+    .veil > div:nth-child(1) { --b: 1px; --a: 42%; --z: 68%; }
+    .veil > div:nth-child(2) { --b: 2px; --a: 30%; --z: 54%; }
+    .veil > div:nth-child(3) { --b: 5px; --a: 16%; --z: 40%; }
+    .veil > div:nth-child(4) { --b: 10px; --a: 0%; --z: 28%; }
+    .veil > div:nth-child(5) { --b: 18px; --a: 0%; --z: 16%; }
+    .veil-tint {
+      background: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--tg-theme-header-bg-color, #fff) 78%, transparent),
+        color-mix(in srgb, var(--tg-theme-header-bg-color, #fff) 30%, transparent) 34%,
+        transparent 70%
+      );
+    }
+    @media (prefers-reduced-transparency: reduce) {
+      .veil > div:not(.veil-tint) { display: none; }
+      .veil-tint {
+        background: linear-gradient(
+          to bottom,
+          var(--tg-theme-header-bg-color, #fff),
+          color-mix(in srgb, var(--tg-theme-header-bg-color, #fff) 88%, transparent) 72%,
+          transparent
+        );
+      }
+    }
     .dock-slot {
       position: sticky;
       top: 0;
       z-index: 25;
-      padding: calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px) + 12px) 12px 12px;
+      padding:
+        calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px) + var(--edge))
+        var(--page-right) 0 var(--page-left);
     }
-    .dock {
-      padding: 6px;
-      border-radius: 22px;
-      border: 1px solid color-mix(in srgb, var(--tg-theme-text-color, #000) 12%, transparent);
-      background: rgba(0, 0, 0, 0.22);
-      box-shadow: 0 10px 28px color-mix(in srgb, #000 18%, transparent);
-      -webkit-backdrop-filter: blur(18px) saturate(1.4);
-      backdrop-filter: blur(18px) saturate(1.4);
-    }
-    #status { margin: 4px 8px; overflow-wrap: anywhere; }
-    #status[hidden] { display: none; }
-    #search { display: flex; align-items: center; gap: 8px; }
-    #search[hidden] { display: none; }
+    #status { margin: 4px 2px 8px; overflow-wrap: anywhere; }
+    .hint { color: var(--tg-theme-hint-color, #8e8e93); font-size: 14px; }
+    #search { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
     #search input {
       flex: 1;
       min-width: 0;
@@ -51,193 +92,218 @@
       font: inherit;
       border: 0;
       border-radius: 16px;
-      /* Android header pills are a 22% black scrim with white icons. A text field stays lighter. */
-      background: color-mix(in srgb, var(--tg-theme-text-color, #000) 4%, var(--tg-theme-header-bg-color, #fff));
-      color: inherit;
+      background: var(--tg-theme-header-bg-color, #fff);
+      background: color-mix(in srgb, var(--tg-theme-text-color, #000) 5%, var(--tg-theme-header-bg-color, #fff));
+      color: var(--tg-theme-text-color, #000);
     }
     #search input::placeholder { color: var(--tg-theme-hint-color, #999); }
-    .icon-btn, .channel {
+    .btn {
+      position: relative;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       flex: none;
+      width: 44px;
       height: 44px;
-      font: inherit;
+      padding: 0;
       border: 0;
       border-radius: 16px;
-      background: var(--tg-theme-button-color, #2481cc);
-      color: var(--tg-theme-button-text-color, #fff);
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
+      cursor: pointer;
     }
-    .icon-btn { width: 44px; padding: 0; }
-    .channel {
-      gap: 6px;
-      padding: 0 14px;
-      white-space: nowrap;
-      background: color-mix(in srgb, var(--tg-theme-button-color, #2481cc) 14%, transparent);
-      color: var(--tg-theme-link-color, var(--tg-theme-button-color, #2481cc));
-    }
-    .channel .icon { width: 18px; height: 18px; }
-    .icon-btn:disabled { opacity: 0.5; }
-    .icon-btn:active, .channel:active { transform: scale(0.96); }
-    .icon-btn:focus-visible, .channel:focus-visible, #search input:focus-visible {
+    .btn .icon { width: 22px; height: 22px; }
+    .btn:active { transform: scale(0.94); }
+    .btn:disabled { opacity: 0.45; }
+    .btn:focus-visible, #search input:focus-visible, .tile:focus-visible {
       outline: 2px solid var(--tg-theme-button-color, #2481cc);
       outline-offset: 2px;
     }
-    main {
-      padding: 0 12px calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px) + 16px);
-      min-width: 0;
-    }
-    .hint, .timings { color: var(--tg-theme-hint-color, #8e8e93); font-size: 13px; }
-    .timings { margin: 0 4px 10px; }
-    .hits { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
-    .card {
-      min-width: 0;
-      overflow: hidden;
-      border-radius: 18px;
-      background: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #fff));
-      box-shadow: 0 1px 2px color-mix(in srgb, #000 14%, transparent);
-      padding-bottom: 12px;
-    }
-    .empty, .error { margin: 0; padding: 14px; overflow-wrap: anywhere; }
-    .error { color: var(--tg-theme-destructive-text-color, #d00); }
-    .media {
-      position: relative;
-      display: flex;
+    .btn[aria-pressed="true"] { background: rgba(255, 255, 255, 0.92); color: #111; }
+    .pending {
+      display: none;
       align-items: center;
-      justify-content: center;
-      max-height: 70vh;
-      background: #111;
-      cursor: pointer;
+      gap: 6px;
+      margin: 0 2px 8px;
+      color: var(--tg-theme-hint-color, #8e8e93);
+      font-size: 13px;
     }
-    .media img, .media video {
+    .pending.htmx-request { display: flex; }
+    main {
+      padding:
+        var(--fade) var(--page-right)
+        calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px) + 16px)
+        var(--page-left);
+      min-width: 0;
+    }
+    .timings { margin: 0 2px 8px; color: var(--tg-theme-hint-color, #8e8e93); font-size: 13px; }
+    .empty { margin: 12px 2px; }
+    .error { margin: 0; color: var(--tg-theme-destructive-text-color, #d00); overflow-wrap: anywhere; }
+    #hits { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; align-items: start; }
+    #hits.ready { display: block; position: relative; }
+    .tile {
+      position: relative;
+      display: block;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 6px;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--tg-theme-text-color, #000) 8%, transparent);
+      color: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #hits.ready .tile { position: absolute; }
+    .tile img, .tile video {
       display: block;
       width: 100%;
       height: auto;
-      max-height: 70vh;
-      object-fit: contain;
       pointer-events: none;
+      -webkit-user-drag: none;
     }
-    .expand {
-      position: absolute;
-      right: 8px;
-      bottom: 8px;
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 10px;
-      background: rgba(0, 0, 0, .55);
-      color: #fff;
-      pointer-events: none;
-    }
-    .expand .icon { width: 16px; height: 16px; }
+    #hits.ready .tile img, #hits.ready .tile video { height: 100%; object-fit: cover; }
+    .tile:active { opacity: 0.88; }
     .play {
       position: absolute;
       left: 50%;
       top: 50%;
-      width: 58px;
-      height: 58px;
+      width: 34px;
+      height: 34px;
       display: flex;
       align-items: center;
       justify-content: center;
       transform: translate(-50%, -50%);
       border-radius: 50%;
-      background: rgba(0, 0, 0, .45);
-      box-shadow: 0 2px 12px rgba(0, 0, 0, .35);
+      background: rgba(0, 0, 0, 0.4);
       color: #fff;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
       pointer-events: none;
     }
-    .play .icon { width: 28px; height: 28px; transform: translateX(2px); }
-    .pending {
-      display: none;
-      align-items: center;
-      gap: 8px;
-      margin: 8px 8px 2px;
-      color: var(--tg-theme-text-color, #000);
-      font-size: 14px;
+    .play .icon { width: 16px; height: 16px; transform: translateX(1px); }
+    .more {
+      display: grid;
+      place-items: center;
+      height: 36px;
+      margin: 4px 0 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--tg-theme-hint-color, #8e8e93);
     }
-    .pending.htmx-request { display: flex; }
+    .more .spinner { visibility: hidden; }
+    .more.htmx-request .spinner { visibility: visible; }
     .sprite { position: absolute; width: 0; height: 0; }
-    .icon { width: 22px; height: 22px; display: block; flex: none; }
-    .spinner { width: 18px; height: 18px; animation: spin .7s linear infinite; }
-    #search .spinner, .pending .spinner { display: none; }
+    .icon { width: 18px; height: 18px; display: block; flex: none; pointer-events: none; }
+    .spinner { animation: spin .7s linear infinite; }
+    #search .spinner { display: none; }
     #search.htmx-request .icon-search { display: none; }
-    #search.htmx-request .spinner, .pending.htmx-request .spinner { display: block; }
+    #search.htmx-request .spinner { display: block; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @media (prefers-reduced-motion: reduce) {
-      .spinner { animation: none; }
-    }
-    .card-foot {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 12px 0;
-    }
-    .card-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-left: auto;
-    }
-    .meta { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 14px; }
-    .scores {
-      width: 100%;
-      margin-top: 8px;
-      font-size: 13px;
-      border-collapse: collapse;
-      table-layout: fixed;
-      text-align: left;
-    }
-    .scores th, .scores td { padding: 2px 12px; overflow-wrap: anywhere; }
-    .scores th { color: var(--tg-theme-hint-color, #8e8e93); font-weight: normal; }
-    .ocr {
-      margin: 8px 12px 0;
-      white-space: pre-line;
-      overflow-wrap: anywhere;
-      font-size: 15px;
-    }
-    .empty { padding-bottom: 14px; }
     #viewer {
       position: fixed;
       inset: 0;
       z-index: 40;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      padding:
-        calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px) + 8px)
-        calc(var(--tg-safe-area-inset-right, 0px) + 12px)
-        calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px) + 12px)
-        calc(var(--tg-safe-area-inset-left, 0px) + 12px);
       background: #000;
       color: #fff;
+      touch-action: none;
+      overscroll-behavior: none;
     }
-    #viewer[hidden] { display: none; }
-    .viewer-bar { display: flex; justify-content: space-between; gap: 8px; }
-    #viewer .viewer-bar .icon-btn {
-      border-radius: 50%;
-      background: rgba(255, 255, 255, .16);
-      color: #fff;
-    }
-    #viewer .icon-btn:focus-visible { outline-color: #fff; }
+    #viewer.settling { transition: background-color .18s linear; }
+    #viewer.dragging, #viewer.dragging #viewer-frame, #viewer.dragging .viewer-chrome { transition: none; }
+    #viewer.settling #viewer-frame { transition: transform .18s ease; }
+    #viewer.settling .viewer-chrome { transition: opacity .18s ease; }
     .viewer-stage {
-      flex: 1;
-      min-height: 0;
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    #viewer-frame {
+      position: absolute;
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
+      transform-origin: center center;
     }
-    .viewer-stage img, .viewer-stage video {
+    #viewer-frame img, #viewer-frame video {
       display: block;
-      width: 100%;
-      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
       object-fit: contain;
     }
-    .viewer-stage [hidden] { display: none !important; }
+    .viewer-chrome { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+    .viewer-bar, #viewer-info { pointer-events: auto; }
+    .viewer-query {
+      position: absolute;
+      top: calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px) + var(--edge));
+      left: var(--page-left);
+      right: var(--page-right);
+      width: fit-content;
+      max-width: calc(100% - var(--page-left) - var(--page-right));
+      margin: 0 auto;
+      padding: 6px 12px;
+      border-radius: 16px;
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.3;
+      text-align: center;
+      overflow-wrap: anywhere;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
+    }
+    .viewer-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px var(--page-right) calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px) + 8px) var(--page-left);
+    }
+    .viewer-actions { display: flex; gap: 8px; }
+    #viewer .btn:focus-visible { outline-color: #fff; }
+    #viewer-info {
+      position: absolute;
+      left: var(--page-left);
+      right: var(--page-right);
+      bottom: calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px) + 60px);
+      max-height: min(42vh, 320px);
+      overflow: auto;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.55);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
+      font-size: 14px;
+      line-height: 1.35;
+      touch-action: pan-y;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    #viewer-info p { margin: 0; overflow-wrap: anywhere; }
+    #viewer-info p + p { margin-top: 8px; }
+    #viewer-meta, #viewer-ranks { color: rgba(255, 255, 255, 0.78); }
+    #viewer-ocr { white-space: pre-line; }
+    @media (prefers-reduced-motion: reduce) {
+      .spinner { animation: none; }
+      #viewer.settling, #viewer.settling #viewer-frame, #viewer.settling .viewer-chrome { transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -269,14 +335,6 @@
     <symbol id="i-play" viewBox="0 0 24 24">
       <path fill="currentColor" d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>
     </symbol>
-    <symbol id="i-maximize" viewBox="0 0 24 24">
-      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M8 3H5a2 2 0 0 0-2 2v3"/>
-        <path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
-        <path d="M3 16v3a2 2 0 0 0 2 2h3"/>
-        <path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
-      </g>
-    </symbol>
     <symbol id="i-external" viewBox="0 0 24 24">
       <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M15 3h6v6"/>
@@ -284,50 +342,98 @@
         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
       </g>
     </symbol>
+    <symbol id="i-info" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 16v-4"/>
+        <path d="M12 8h.01"/>
+      </g>
+    </symbol>
   </svg>
+  <div class="veil" aria-hidden="true">
+    <div></div><div></div><div></div><div></div><div></div>
+    <div class="veil-tint"></div>
+  </div>
   <div class="dock-slot">
-    <header class="dock">
-      <p id="status" class="hint">Вход…</p>
-      <form id="search" hidden
-            hx-post="api/search" hx-target="#results" hx-swap="innerHTML"
-            hx-vals='{"limit": 30}'
-            hx-indicator="#pending, #search"
-            hx-disabled-elt="#search button">
-        <input name="query" type="search" required autocomplete="off" enterkeyhint="search" placeholder="Текст, шаблон или сцена">
-        <button type="submit" class="icon-btn" aria-label="Найти">
-          <svg class="icon icon-search" aria-hidden="true"><use href="#i-search"/></svg>
-          <svg class="icon spinner" aria-hidden="true"><use href="#i-loader"/></svg>
-        </button>
-      </form>
-      <p id="pending" class="pending" role="status"><svg class="icon spinner" aria-hidden="true"><use href="#i-loader"/></svg>Ищем…</p>
-    </header>
+    <p id="status" class="hint">Вход…</p>
+    <form id="search" hidden
+          hx-post="api/search" hx-target="#results" hx-swap="innerHTML"
+          hx-vals='{"limit": 20, "offset": 0}'
+          hx-indicator="#pending, #search"
+          hx-disabled-elt="#search button">
+      <input name="query" type="search" required autocomplete="off" enterkeyhint="search" placeholder="Текст, шаблон или сцена">
+      <button type="submit" class="btn" aria-label="Найти">
+        <svg class="icon icon-search" aria-hidden="true"><use href="#i-search"/></svg>
+        <svg class="icon spinner" aria-hidden="true"><use href="#i-loader"/></svg>
+      </button>
+    </form>
+    <p id="pending" class="pending" role="status"><svg class="icon spinner" aria-hidden="true"><use href="#i-loader"/></svg>Ищем…</p>
   </div>
   <main id="results"></main>
   <div id="viewer" hidden>
-    <div class="viewer-bar">
-      <button type="button" id="viewer-close" class="icon-btn" aria-label="Закрыть">
-        <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
-      </button>
-      <button type="button" id="viewer-save" class="icon-btn" aria-label="Скачать">
-        <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
-      </button>
+    <div class="viewer-stage" id="viewer-stage">
+      <div id="viewer-frame">
+        <img id="viewer-img" alt="" hidden>
+        <video id="viewer-video" controls playsinline webkit-playsinline hidden></video>
+      </div>
     </div>
-    <div class="viewer-stage">
-      <img id="viewer-img" alt="" hidden>
-      <video id="viewer-video" controls playsinline webkit-playsinline hidden></video>
+    <div class="viewer-chrome" id="viewer-chrome">
+      <p id="viewer-query" class="viewer-query" hidden></p>
+      <div id="viewer-info" hidden>
+        <p id="viewer-meta"></p>
+        <p id="viewer-ranks"></p>
+        <p id="viewer-ocr"></p>
+      </div>
+      <div class="viewer-bar">
+        <button type="button" id="viewer-close" class="btn" aria-label="Закрыть">
+          <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+        </button>
+        <div class="viewer-actions">
+          <button type="button" id="viewer-public" class="btn" aria-label="В паблик" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>
+          </button>
+          <button type="button" id="viewer-info-btn" class="btn" aria-label="О меме" aria-pressed="false">
+            <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
+          </button>
+          <button type="button" id="viewer-save" class="btn" aria-label="Скачать">
+            <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
   <script>
     const fullScreenPlatforms = ['ios', 'android', 'android_x'];
+    const GAP = 4;
     const tgWebApp = window.Telegram?.WebApp;
     const statusLine = document.getElementById('status');
     const form = document.getElementById('search');
+    const slot = document.querySelector('.dock-slot');
     const viewer = document.getElementById('viewer');
+    const stage = document.getElementById('viewer-stage');
+    const frame = document.getElementById('viewer-frame');
+    const chrome = document.getElementById('viewer-chrome');
     const viewerImg = document.getElementById('viewer-img');
     const viewerVideo = document.getElementById('viewer-video');
+    const info = document.getElementById('viewer-info');
+    const infoBtn = document.getElementById('viewer-info-btn');
+    const publicBtn = document.getElementById('viewer-public');
     const themeMeta = document.querySelector('meta[name="theme-color"]');
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let token = null;
     let viewerFile = null;
+    let viewerPublic = null;
+    let viewerKind = 'image';
+    let lockedScroll = 0;
+    let paging = false;
+    let laidWidth = -1;
+    let layoutQueued = false;
+    let dismissTimer = 0;
+    let scale = 1;
+    let tx = 0;
+    let ty = 0;
+    let gesture = null;
+    const pointers = new Map();
 
     function themeColor(name, fallback) {
       const value = tgWebApp?.themeParams?.[name];
@@ -352,11 +458,15 @@
       tgWebApp?.setBackgroundColor?.('#000000');
     }
 
+    function syncVeil() {
+      const fade = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fade')) || 32;
+      document.documentElement.style.setProperty('--veil-h', `${slot.offsetHeight + fade}px`);
+    }
+
     function attachmentUrl(url, fileName) {
       const safeName = fileName.replace(/["\\]/g, '');
       const value = `attachment; filename="${safeName}"`;
       const sep = url.includes('?') ? '&' : '?';
-      // Telegram saves the file only when the response says it is an attachment.
       return `${url}${sep}response-content-disposition=${encodeURIComponent(value)}`;
     }
 
@@ -386,13 +496,61 @@
       location.assign(href);
     }
 
-    function openViewer(url, kind, name) {
-      viewerFile = { url, name };
-      if (kind === 'video') {
+    function lockScroll() {
+      lockedScroll = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${lockedScroll}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+    }
+
+    function unlockScroll() {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+      window.scrollTo(0, lockedScroll);
+      relayoutIfWidthChanged();
+    }
+
+    function resetZoom() {
+      scale = 1;
+      tx = 0;
+      ty = 0;
+      gesture = null;
+      pointers.clear();
+      window.clearTimeout(dismissTimer);
+      viewer.classList.remove('dragging', 'settling');
+      frame.style.transform = '';
+      viewer.style.backgroundColor = '';
+      chrome.style.opacity = '';
+    }
+
+    function setLine(id, value) {
+      const node = document.getElementById(id);
+      node.textContent = value || '';
+      node.hidden = !node.textContent;
+    }
+
+    function openViewer(opener) {
+      viewerFile = { url: opener.dataset.open, name: opener.dataset.name };
+      viewerPublic = opener.dataset.public || null;
+      viewerKind = opener.dataset.kind || 'image';
+      publicBtn.hidden = !viewerPublic;
+      setLine('viewer-query', opener.closest('#hits')?.dataset.query || '');
+      setLine('viewer-meta', opener.dataset.meta);
+      setLine('viewer-ranks', opener.dataset.ranks);
+      setLine('viewer-ocr', opener.dataset.ocr);
+      info.hidden = true;
+      infoBtn.setAttribute('aria-pressed', 'false');
+      resetZoom();
+      if (viewerKind === 'video') {
         viewerImg.hidden = true;
         viewerImg.removeAttribute('src');
         viewerVideo.hidden = false;
-        viewerVideo.src = url;
+        viewerVideo.src = opener.dataset.open;
         viewerVideo.play().catch(() => {});
       } else {
         viewerVideo.pause();
@@ -400,30 +558,338 @@
         viewerVideo.load();
         viewerVideo.hidden = true;
         viewerImg.hidden = false;
-        viewerImg.src = url;
+        viewerImg.src = opener.dataset.open;
       }
       viewer.hidden = false;
-      document.body.classList.add('viewer-open');
+      lockScroll();
       viewerChrome();
       tgWebApp?.BackButton?.show();
     }
 
     function closeViewer() {
       if (viewer.hidden) return;
+      window.clearTimeout(dismissTimer);
       viewer.hidden = true;
       viewerFile = null;
+      viewerPublic = null;
+      info.hidden = true;
+      resetZoom();
       viewerImg.removeAttribute('src');
       viewerImg.hidden = true;
       viewerVideo.pause();
       viewerVideo.removeAttribute('src');
       viewerVideo.load();
       viewerVideo.hidden = true;
-      document.body.classList.remove('viewer-open');
+      unlockScroll();
       tgWebApp?.BackButton?.hide();
       syncChrome();
     }
 
+    function render(extraY = 0) {
+      frame.style.transform = `translate(${tx}px, ${ty + extraY}px) scale(${scale})`;
+    }
+
+    function fitted() {
+      const media = viewerImg.hidden ? viewerVideo : viewerImg;
+      const rect = stage.getBoundingClientRect();
+      const nw = media.naturalWidth || media.videoWidth || rect.width || 1;
+      const nh = media.naturalHeight || media.videoHeight || rect.height || 1;
+      const fit = Math.min(rect.width / nw, rect.height / nh);
+      return { w: nw * fit, h: nh * fit, rect };
+    }
+
+    function clampPan() {
+      if (scale <= 1.001) {
+        scale = 1;
+        tx = 0;
+        ty = 0;
+        return;
+      }
+      const { w, h, rect } = fitted();
+      const maxX = Math.max(0, (w * scale - rect.width) / 2);
+      const maxY = Math.max(0, (h * scale - rect.height) / 2);
+      tx = Math.min(maxX, Math.max(-maxX, tx));
+      ty = Math.min(maxY, Math.max(-maxY, ty));
+    }
+
+    function zoomAt(clientX, clientY, next) {
+      const rect = stage.getBoundingClientRect();
+      const focalX = clientX - rect.left - rect.width / 2;
+      const focalY = clientY - rect.top - rect.height / 2;
+      const nextScale = Math.min(4, Math.max(1, next));
+      if (nextScale === 1) {
+        scale = 1;
+        tx = 0;
+        ty = 0;
+        render();
+        return;
+      }
+      const k = nextScale / scale;
+      tx = focalX * (1 - k) + tx * k;
+      ty = focalY * (1 - k) + ty * k;
+      scale = nextScale;
+      clampPan();
+      render();
+    }
+
+    function onVideoControls(event) {
+      if (event.target !== viewerVideo || viewerVideo.hidden) return false;
+      const rect = viewerVideo.getBoundingClientRect();
+      return event.clientY > rect.bottom - 48;
+    }
+
+    function settleDismiss(dy) {
+      viewer.classList.remove('dragging');
+      if (Math.abs(dy) > 100) {
+        if (reduceMotion) {
+          closeViewer();
+          return;
+        }
+        const sign = dy < 0 ? -1 : 1;
+        viewer.classList.add('settling');
+        requestAnimationFrame(() => {
+          frame.style.transform = `translateY(${sign * window.innerHeight}px)`;
+          chrome.style.opacity = '0';
+          viewer.style.backgroundColor = 'transparent';
+        });
+        dismissTimer = window.setTimeout(closeViewer, 180);
+        return;
+      }
+      viewer.classList.add('settling');
+      requestAnimationFrame(() => {
+        render(0);
+        chrome.style.opacity = '';
+        viewer.style.backgroundColor = '';
+      });
+    }
+
+    stage.addEventListener('pointerdown', (event) => {
+      if (viewer.hidden || onVideoControls(event)) return;
+      try { stage.setPointerCapture(event.pointerId); } catch { /* pointer already gone */ }
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      viewer.classList.add('dragging');
+      viewer.classList.remove('settling');
+      if (pointers.size >= 2) {
+        const [a, b] = [...pointers.values()];
+        gesture = {
+          type: 'pinch',
+          dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+          scale, tx, ty,
+          focalX: (a.x + b.x) / 2,
+          focalY: (a.y + b.y) / 2,
+        };
+        return;
+      }
+      gesture = { type: 'pending', x: event.clientX, y: event.clientY, tx, ty, dismiss: 0, moved: false };
+    });
+
+    stage.addEventListener('pointermove', (event) => {
+      if (!pointers.has(event.pointerId) || !gesture) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (gesture.type === 'pinch' && pointers.size >= 2) {
+        const [a, b] = [...pointers.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+        const rect = stage.getBoundingClientRect();
+        const focalX = (a.x + b.x) / 2 - rect.left - rect.width / 2;
+        const focalY = (a.y + b.y) / 2 - rect.top - rect.height / 2;
+        const startFocalX = gesture.focalX - rect.left - rect.width / 2;
+        const startFocalY = gesture.focalY - rect.top - rect.height / 2;
+        const nextScale = Math.min(4, Math.max(1, gesture.scale * dist / gesture.dist));
+        const k = gesture.scale === 0 ? 1 : nextScale / gesture.scale;
+        scale = nextScale;
+        tx = startFocalX * (1 - k) + gesture.tx * k + (focalX - startFocalX);
+        ty = startFocalY * (1 - k) + gesture.ty * k + (focalY - startFocalY);
+        if (scale === 1) { tx = 0; ty = 0; }
+        clampPan();
+        render();
+        return;
+      }
+      if (gesture.type !== 'pending' && gesture.type !== 'dismiss' && gesture.type !== 'pan') return;
+      const dx = event.clientX - gesture.x;
+      const dy = event.clientY - gesture.y;
+      if (gesture.type === 'pending') {
+        if (Math.hypot(dx, dy) < 8) return;
+        gesture.moved = true;
+        gesture.type = scale > 1 ? 'pan' : (Math.abs(dy) > Math.abs(dx) ? 'dismiss' : 'ignore');
+      }
+      if (gesture.type === 'pan') {
+        tx = gesture.tx + dx;
+        ty = gesture.ty + dy;
+        clampPan();
+        render();
+      } else if (gesture.type === 'dismiss') {
+        gesture.dismiss = dy;
+        const travel = Math.min(Math.abs(dy) / 240, 1);
+        chrome.style.opacity = String(1 - travel);
+        viewer.style.backgroundColor = `rgba(0, 0, 0, ${1 - travel * 0.55})`;
+        render(dy);
+      }
+    });
+
+    function endPointer(event) {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.delete(event.pointerId);
+      if (pointers.size >= 2) return;
+      if (pointers.size === 1 && scale > 1) {
+        const left = [...pointers.entries()][0];
+        gesture = { type: 'pan', x: left[1].x, y: left[1].y, tx, ty, dismiss: 0, moved: true };
+        return;
+      }
+      const ended = gesture;
+      gesture = null;
+      pointers.clear();
+      if (!ended) return;
+      if (ended.type === 'dismiss') {
+        settleDismiss(ended.dismiss);
+        return;
+      }
+      viewer.classList.remove('dragging');
+      if (scale <= 1.001) {
+        scale = 1;
+        tx = 0;
+        ty = 0;
+        render();
+      }
+      if (ended.moved || viewerKind === 'video' || event.pointerType === 'mouse') return;
+      const now = performance.now();
+      if (now - (endPointer.lastTap || 0) < 280) {
+        endPointer.lastTap = 0;
+        if (scale > 1) zoomAt(event.clientX, event.clientY, 1);
+        else zoomAt(event.clientX, event.clientY, 2.5);
+        return;
+      }
+      endPointer.lastTap = now;
+    }
+
+    stage.addEventListener('pointerup', endPointer);
+    stage.addEventListener('pointercancel', endPointer);
+    stage.addEventListener('dblclick', (event) => {
+      if (viewer.hidden || viewerKind === 'video') return;
+      event.preventDefault();
+      zoomAt(event.clientX, event.clientY, scale > 1 ? 1 : 2.5);
+    });
+    stage.addEventListener('wheel', (event) => {
+      if (viewer.hidden) return;
+      event.preventDefault();
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+      zoomAt(event.clientX, event.clientY, scale * Math.exp(-delta * 0.0016));
+    }, { passive: false });
+
+    function aspectOf(tile) {
+      const media = tile.querySelector('img, video');
+      const w = media?.naturalWidth || media?.videoWidth || Number(media?.getAttribute('width')) || 0;
+      const h = media?.naturalHeight || media?.videoHeight || Number(media?.getAttribute('height')) || 0;
+      if (w > 0 && h > 0) return w / h;
+      return 1;
+    }
+
+    function layoutHits() {
+      const list = document.getElementById('hits');
+      if (!list) return;
+      const tiles = [...list.querySelectorAll(':scope > .tile')];
+      const width = list.clientWidth;
+      if (!tiles.length || width <= 0) return;
+      laidWidth = width;
+      const aspects = tiles.map(aspectOf);
+      // One square would take half a phone row. Cap the height so a wider window adds
+      // columns instead of a fixed phone column with empty space beside it.
+      const target = Math.min(220, Math.max(96, (width - GAP) / 2));
+      const rows = [];
+      let index = 0;
+      while (index < tiles.length) {
+        const row = [];
+        let sum = 0;
+        while (index < tiles.length) {
+          const nextSum = sum + aspects[index];
+          const nextCount = row.length + 1;
+          const nextWidth = nextSum * target + GAP * (nextCount - 1);
+          if (row.length && nextWidth > width) {
+            const without = Math.abs((width - GAP * (row.length - 1)) / sum - target);
+            const withIt = Math.abs((width - GAP * row.length) / nextSum - target);
+            if (without <= withIt) break;
+          }
+          row.push(index);
+          sum = nextSum;
+          index += 1;
+          if (nextWidth >= width) break;
+        }
+        rows.push(row);
+      }
+      let y = 0;
+      rows.forEach((row, rowIndex) => {
+        const sum = row.reduce((total, item) => total + aspects[item], 0);
+        const natural = sum * target + GAP * (row.length - 1);
+        // A lone leftover stays at the target height. Every other row fills the width.
+        const scaleToWidth = rowIndex !== rows.length - 1 || row.length > 1 || natural > width;
+        const rowHeight = scaleToWidth ? (width - GAP * (row.length - 1)) / sum : target;
+        let x = 0;
+        row.forEach((item, itemIndex) => {
+          const lastInRow = itemIndex === row.length - 1;
+          const tileWidth = lastInRow && scaleToWidth
+            ? Math.max(1, width - x)
+            : Math.max(1, Math.round(aspects[item] * rowHeight));
+          const tile = tiles[item];
+          tile.style.left = `${x}px`;
+          tile.style.top = `${y}px`;
+          tile.style.width = `${tileWidth}px`;
+          tile.style.height = `${Math.max(1, Math.round(rowHeight))}px`;
+          x += tileWidth + GAP;
+        });
+        y += Math.round(rowHeight) + GAP;
+      });
+      list.style.height = `${Math.max(0, y - GAP)}px`;
+      list.classList.add('ready');
+    }
+
+    function queueLayout() {
+      if (layoutQueued) return;
+      layoutQueued = true;
+      requestAnimationFrame(() => {
+        layoutQueued = false;
+        layoutHits();
+      });
+    }
+
+    function relayoutIfWidthChanged() {
+      const hits = document.getElementById('hits');
+      const width = hits?.clientWidth || document.querySelector('main').clientWidth;
+      if (Math.abs(width - laidWidth) < 1) return;
+      queueLayout();
+    }
+
+    function maybeFireMore() {
+      const more = document.getElementById('more');
+      if (!more || paging) return;
+      if (more.getBoundingClientRect().top > window.innerHeight + 280) return;
+      paging = true;
+      htmx.process(more);
+      htmx.trigger(more, 'loadmore');
+    }
+
+    function ingestPage(html, sentinel) {
+      const parsed = new DOMParser().parseFromString(html, 'text/html');
+      const hits = document.getElementById('hits');
+      if (hits) {
+        for (const tile of parsed.querySelectorAll('.tile')) hits.append(tile);
+      }
+      const next = parsed.querySelector('#more');
+      if (next) {
+        sentinel.replaceWith(next);
+        htmx.process(next);
+      } else {
+        sentinel.remove();
+      }
+      layoutHits();
+      paging = false;
+      maybeFireMore();
+    }
+
     syncChrome();
+    syncVeil();
+    new ResizeObserver(syncVeil).observe(slot);
+    new ResizeObserver(relayoutIfWidthChanged).observe(document.documentElement);
+    window.addEventListener('resize', relayoutIfWidthChanged);
+
     if (tgWebApp) {
       tgWebApp.onEvent?.('themeChanged', () => {
         if (viewer.hidden) syncChrome();
@@ -431,9 +897,7 @@
       tgWebApp.disableVerticalSwipes?.();
       tgWebApp.expand();
       try {
-        if (fullScreenPlatforms.includes(tgWebApp.platform)) {
-          tgWebApp.requestFullscreen();
-        }
+        if (fullScreenPlatforms.includes(tgWebApp.platform)) tgWebApp.requestFullscreen();
       } catch {
         // requestFullscreen not supported (Bot API < 8.0)
       }
@@ -454,68 +918,77 @@
         if (!response.ok) {
           const detail = typeof body.detail === 'string' ? body.detail : '';
           const outsideTelegram = !initData && detail === 'Missing init_data';
-          showAuthError(
-            outsideTelegram
-              ? 'Откройте приложение из Telegram'
-              : (detail || `Ошибка входа: ${response.status}`),
-          );
+          showAuthError(outsideTelegram ? 'Откройте приложение из Telegram' : (detail || `Ошибка входа: ${response.status}`));
           return;
         }
         token = body.token;
         statusLine.hidden = true;
         form.hidden = false;
+        syncVeil();
       } catch (e) {
         showAuthError(`Ошибка входа: ${e.message}`);
       }
     }
 
     document.body.addEventListener('click', (event) => {
-      const channel = event.target.closest('[data-channel]');
-      if (channel) {
-        event.stopPropagation();
-        openPublic(channel.dataset.channel);
-        return;
-      }
-      const download = event.target.closest('[data-download]');
-      if (download) {
-        event.stopPropagation();
-        saveFile(download.dataset.download, download.dataset.name);
-        return;
-      }
-      const opener = event.target.closest('[data-open]');
-      if (opener) openViewer(opener.dataset.open, opener.dataset.kind, opener.dataset.name);
+      const opener = event.target.closest?.('[data-open]');
+      if (!opener || viewer.contains(opener)) return;
+      openViewer(opener);
     });
     document.body.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        closeViewer();
-        return;
-      }
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      const opener = event.target.closest?.('[data-open]');
-      if (!opener) return;
-      event.preventDefault();
-      openViewer(opener.dataset.open, opener.dataset.kind, opener.dataset.name);
+      if (event.key === 'Escape') closeViewer();
     });
     document.getElementById('viewer-close').addEventListener('click', closeViewer);
     document.getElementById('viewer-save').addEventListener('click', () => {
       if (viewerFile) saveFile(viewerFile.url, viewerFile.name);
     });
-    viewer.addEventListener('click', (event) => {
-      if (event.target === viewer || event.target.classList.contains('viewer-stage')) closeViewer();
+    publicBtn.addEventListener('click', () => {
+      if (viewerPublic) openPublic(viewerPublic);
+    });
+    infoBtn.addEventListener('click', () => {
+      const show = info.hidden;
+      info.hidden = !show;
+      infoBtn.setAttribute('aria-pressed', String(show));
     });
 
     document.body.addEventListener('htmx:configRequest', (event) => {
       if (token) event.detail.headers['Authorization'] = `Bearer ${token}`;
+    });
+    document.body.addEventListener('htmx:beforeRequest', (event) => {
+      if (event.detail.elt?.id !== 'search') return;
+      document.getElementById('more')?.remove();
     });
     document.body.addEventListener('htmx:beforeSwap', (event) => {
       if (event.detail.xhr.status === 401) {
         event.detail.shouldSwap = true;
         event.detail.isError = false;
       }
+      if (event.detail.target?.id !== 'more') return;
+      if (event.detail.xhr.status >= 400) return;
+      event.detail.shouldSwap = false;
+      ingestPage(event.detail.serverResponse, event.detail.target);
     });
     document.body.addEventListener('htmx:afterSwap', (event) => {
-      if (event.detail.target.id === 'results') window.scrollTo(0, 0);
+      if (event.detail.target?.id !== 'results') return;
+      window.scrollTo(0, 0);
+      layoutHits();
+      window.setTimeout(() => { maybeFireMore(); }, 50);
     });
+    document.body.addEventListener('htmx:afterSettle', (event) => {
+      if (event.detail.target?.id !== 'results') return;
+      maybeFireMore();
+    });
+    document.body.addEventListener('htmx:afterRequest', (event) => {
+      if (event.detail.successful || event.detail.elt?.id !== 'more') return;
+      paging = false;
+    });
+    document.body.addEventListener('load', (event) => {
+      if (event.target?.closest?.('#hits')) queueLayout();
+    }, true);
+    document.body.addEventListener('loadedmetadata', (event) => {
+      if (event.target?.closest?.('#hits')) queueLayout();
+    }, true);
+    window.addEventListener('scroll', () => { maybeFireMore(); }, { passive: true });
 
     authenticate();
   </script>
