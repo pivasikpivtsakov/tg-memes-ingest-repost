@@ -32,7 +32,8 @@
       overflow-x: clip;
     }
     /* CSS has no per-pixel blur radius (Apple uses one GPU shader). These are compositor
-       backdrop-filter layers: stronger blur only covers the top, so it fades out. */
+       backdrop-filter layers: stronger blur only covers the top, so it fades out.
+       Blur is paid for the whole box; the mask is clear past --z, so the box stops there. */
     .veil {
       position: fixed;
       z-index: 20;
@@ -44,10 +45,19 @@
     }
     .veil > div { position: absolute; inset: 0; }
     .veil > div:not(.veil-tint) {
+      bottom: auto;
+      height: calc(var(--z) + 2px);
       -webkit-backdrop-filter: blur(var(--b)) saturate(1.15);
       backdrop-filter: blur(var(--b)) saturate(1.15);
       -webkit-mask-image: linear-gradient(to bottom, #000 var(--a), transparent var(--z));
       mask-image: linear-gradient(to bottom, #000 var(--a), transparent var(--z));
+      /* Stops stay in veil coordinates; default mask-position is center. */
+      -webkit-mask-size: 100% var(--veil-h, 120px);
+      mask-size: 100% var(--veil-h, 120px);
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-position: top;
+      mask-position: top;
     }
     .veil > div:nth-child(1) { --b: 1px; --a: 42%; --z: 68%; }
     .veil > div:nth-child(2) { --b: 2px; --a: 30%; --z: 54%; }
@@ -215,6 +225,8 @@
       touch-action: none;
       overscroll-behavior: none;
     }
+    /* Fly-off keeps the node full-screen; without this the next tap hits it and sticks. */
+    #viewer.dismissed { pointer-events: none; }
     #viewer.settling { transition: background-color .18s linear; }
     #viewer.dragging, #viewer.dragging #viewer-frame, #viewer.dragging .viewer-chrome { transition: none; }
     #viewer.settling #viewer-frame { transition: transform .18s ease; }
@@ -459,8 +471,12 @@
     }
 
     function syncVeil() {
-      const fade = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fade')) || 32;
-      document.documentElement.style.setProperty('--veil-h', `${slot.offsetHeight + fade}px`);
+      const bar = form.querySelector('input');
+      const cover = bar.offsetHeight
+        ? bar.getBoundingClientRect().bottom + bar.offsetHeight / 2
+        : slot.getBoundingClientRect().bottom;
+      // .veil-tint is clear at 70%, so the box has to run past the cover line.
+      document.documentElement.style.setProperty('--veil-h', `${cover / 0.7}px`);
     }
 
     function attachmentUrl(url, fileName) {
@@ -497,6 +513,7 @@
     }
 
     function lockScroll() {
+      if (document.body.style.position === 'fixed') return;
       lockedScroll = window.scrollY;
       document.body.style.position = 'fixed';
       document.body.style.top = `-${lockedScroll}px`;
@@ -522,7 +539,7 @@
       gesture = null;
       pointers.clear();
       window.clearTimeout(dismissTimer);
-      viewer.classList.remove('dragging', 'settling');
+      viewer.classList.remove('dragging', 'settling', 'dismissed');
       frame.style.transform = '';
       viewer.style.backgroundColor = '';
       chrome.style.opacity = '';
@@ -638,9 +655,34 @@
       return event.clientY > rect.bottom - 48;
     }
 
-    function settleDismiss(dy) {
+    function releaseViewer(pointerType) {
+      viewer.classList.add('dismissed');
+      if (pointerType === 'touch') {
+        const blockTouchEnd = (event) => {
+          event.preventDefault();
+          stage.removeEventListener('touchend', blockTouchEnd);
+        };
+        stage.addEventListener('touchend', blockTouchEnd, { passive: false });
+        window.setTimeout(() => stage.removeEventListener('touchend', blockTouchEnd), 0);
+      }
+      // Drop only the swipe's compatibility click; the next pointerdown is a real tap.
+      const stop = (event) => {
+        if (event?.type === 'click') {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        document.removeEventListener('click', stop, true);
+        document.removeEventListener('pointerdown', stop, true);
+      };
+      document.addEventListener('click', stop, true);
+      document.addEventListener('pointerdown', stop, true);
+      window.setTimeout(stop, 500);
+    }
+
+    function settleDismiss(dy, pointerType) {
       viewer.classList.remove('dragging');
       if (Math.abs(dy) > 100) {
+        releaseViewer(pointerType);
         if (reduceMotion) {
           closeViewer();
           return;
@@ -728,6 +770,9 @@
 
     function endPointer(event) {
       if (!pointers.has(event.pointerId)) return;
+      try {
+        if (stage.hasPointerCapture(event.pointerId)) stage.releasePointerCapture(event.pointerId);
+      } catch { /* pointer already gone */ }
       pointers.delete(event.pointerId);
       if (pointers.size >= 2) return;
       if (pointers.size === 1 && scale > 1) {
@@ -740,7 +785,7 @@
       pointers.clear();
       if (!ended) return;
       if (ended.type === 'dismiss') {
-        settleDismiss(ended.dismiss);
+        settleDismiss(ended.dismiss, event.pointerType);
         return;
       }
       viewer.classList.remove('dragging');
@@ -763,6 +808,12 @@
 
     stage.addEventListener('pointerup', endPointer);
     stage.addEventListener('pointercancel', endPointer);
+    // Chrome turns an uncancelled swipe into a fling and drops clicks until it ends.
+    viewer.addEventListener('touchmove', (event) => {
+      if (viewer.hidden || onVideoControls(event)) return;
+      if (event.target.closest?.('#viewer-info')) return;
+      event.preventDefault();
+    }, { passive: false });
     stage.addEventListener('dblclick', (event) => {
       if (viewer.hidden || viewerKind === 'video') return;
       event.preventDefault();
@@ -930,9 +981,28 @@
       }
     }
 
+    let tileTap = null;
+    document.body.addEventListener('pointerdown', (event) => {
+      tileTap = null;
+      if (event.button !== 0 || event.pointerType === 'mouse') return;
+      if (!viewer.hidden && !viewer.classList.contains('dismissed')) return;
+      const opener = event.target.closest?.('[data-open]');
+      if (!opener || viewer.contains(opener)) return;
+      tileTap = { opener, x: event.clientX, y: event.clientY };
+    });
+    document.body.addEventListener('pointerup', (event) => {
+      const tap = tileTap;
+      tileTap = null;
+      if (!tap || event.pointerType === 'mouse') return;
+      if (Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 10) return;
+      if (event.target.closest?.('[data-open]') !== tap.opener) return;
+      openViewer(tap.opener);
+    });
+    document.body.addEventListener('pointercancel', () => { tileTap = null; });
     document.body.addEventListener('click', (event) => {
       const opener = event.target.closest?.('[data-open]');
       if (!opener || viewer.contains(opener)) return;
+      if (!viewer.hidden && !viewer.classList.contains('dismissed')) return;
       openViewer(opener);
     });
     document.body.addEventListener('keydown', (event) => {
