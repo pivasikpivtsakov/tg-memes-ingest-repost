@@ -10,6 +10,9 @@ CLIP_MODEL_NAME = "xlm-roberta-base-ViT-B-32"
 CLIP_PRETRAINED = "laion5b_s13b_b90k"
 CLIP_MODEL_TAG = f"{CLIP_MODEL_NAME}/{CLIP_PRETRAINED}"
 
+# The vision tower sees 224px crops; 640 keeps the short side above that even for tall memes.
+CLIP_FRAME_MAX_SIDE = 640
+
 
 class ClipTower(StrEnum):
     VISUAL = "visual"

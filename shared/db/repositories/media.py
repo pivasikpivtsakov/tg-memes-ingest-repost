@@ -248,7 +248,9 @@ class MediaRepository(PostgresRepository):
             return
         async with self._session() as session:
             await session.execute(
-                update(Media),
+                update(Media)
+                .where(Media.posted_message_id.is_(None))
+                .execution_options(synchronize_session=None),
                 [
                     {Media.id.key: media_id, Media.posted_message_id.key: message_id}
                     for media_id, message_id in posted_message_ids.items()

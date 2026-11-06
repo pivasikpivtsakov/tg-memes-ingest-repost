@@ -9,13 +9,10 @@ from clip_indexer_app.services import ClipImageEncoder
 from shared.db.repositories import ClipEmbeddingRepository, ClipEmbeddingRow
 from shared.device import DeviceChoice
 from shared.indexer_base import AbstractIndexerApp, DownloadedMedia, IndexBatchResult
-from shared.search.clip import CLIP_MODEL_TAG
+from shared.search.clip import CLIP_FRAME_MAX_SIDE, CLIP_MODEL_TAG
 from shared.search.frames import load_frames
 
 logger = logging.getLogger(__name__)
-
-# The vision tower sees 224px crops; 640 keeps the short side above that even for tall memes.
-_FRAME_MAX_SIDE = 640
 
 
 class ClipIndexerApp(AbstractIndexerApp[ClipEmbeddingRow, ClipIndexerConfig]):
@@ -44,7 +41,7 @@ class ClipIndexerApp(AbstractIndexerApp[ClipEmbeddingRow, ClipIndexerConfig]):
                 item.data,
                 media.media_type,
                 video_frames=self.config.clip_video_frames,
-                max_side=_FRAME_MAX_SIDE,
+                max_side=CLIP_FRAME_MAX_SIDE,
             )
             return [self.encoder.preprocess(frame) for frame in frames]
         except Exception as e:

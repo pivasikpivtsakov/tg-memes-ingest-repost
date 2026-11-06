@@ -11,8 +11,6 @@ from shared.s3.repositories import ObjectRepository
 
 logger = logging.getLogger(__name__)
 
-_MISSING_OBJECT_CODES = frozenset({"NoSuchKey", "404"})
-
 
 class MediaIndexService[RowT]:
     """Finds medias missing from one index table, fetches their files and stores results."""
@@ -63,7 +61,7 @@ class MediaIndexService[RowT]:
         try:
             return self._objects.get(file_path)
         except ClientError as e:
-            if e.response["Error"]["Code"] in _MISSING_OBJECT_CODES:
+            if self._objects.is_missing(e):
                 return None
             raise
 
